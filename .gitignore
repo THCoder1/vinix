@@ -1,0 +1,6 @@
+node_modules
+.next
+.env
+.env.local
+.turbo
+.DS_Store
