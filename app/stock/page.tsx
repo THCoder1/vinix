@@ -97,9 +97,9 @@ export default function StockPage() {
           <h1>Vehicles</h1>
         </div>
 
-        <button className="primary-button">
+        <Link href="/vehicles/new" className="primary-button">
           + Add vehicle
-        </button>
+        </Link>
       </div>
 
       <section className="stock-toolbar">

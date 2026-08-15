@@ -1,0 +1,160 @@
+"use client";
+
+import Link from "next/link";
+import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
+
+export default function NewVehiclePage() {
+  const router = useRouter();
+
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [vin, setVin] = useState("");
+  const [registration, setRegistration] = useState("");
+  const [make, setMake] = useState("");
+  const [model, setModel] = useState("");
+  const [version, setVersion] = useState("");
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  event.preventDefault();
+
+  setSaving(true);
+  setError("");
+
+  try {
+    const response = await fetch("/api/vehicles", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        vin,
+        registration: registration || undefined,
+        make,
+        model,
+        version: version || undefined,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(
+        data.error || "Unable to create vehicle."
+      );
+    }
+
+    router.push(`/vehicles/${data.vehicle.id}`);
+  } catch (error) {
+    setError(
+      error instanceof Error
+        ? error.message
+        : "Unable to create vehicle."
+    );
+  } finally {
+    setSaving(false);
+  }
+}
+
+  return (
+    <main className="main">
+      <Link href="/stock" className="back-link">
+        ← Back to stock
+      </Link>
+
+      <div className="eyebrow">VINIX / STOCK / NEW VEHICLE</div>
+
+      <div className="page-header">
+        <div>
+          <h1>Add vehicle</h1>
+          <p className="muted-text">
+            Create a new vehicle record.
+          </p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="workspace-card">
+        <div className="section-heading">
+          <div>
+            <div className="eyebrow">Vehicle identity</div>
+            <h2>Basic information</h2>
+          </div>
+        </div>
+
+        <div className="form-grid">
+          <label className="form-field">
+            <span>VIN *</span>
+            <input
+              value={vin}
+              onChange={(event) => setVin(event.target.value)}
+              placeholder="e.g. WVWZZZ1KZ..."
+              required
+            />
+          </label>
+
+          <label className="form-field">
+            <span>Registration</span>
+            <input
+              value={registration}
+              onChange={(event) =>
+                setRegistration(event.target.value)
+              }
+              placeholder="e.g. 1234 ABC"
+            />
+          </label>
+
+          <label className="form-field">
+            <span>Make *</span>
+            <input
+              value={make}
+              onChange={(event) => setMake(event.target.value)}
+              placeholder="Volkswagen"
+              required
+            />
+          </label>
+
+          <label className="form-field">
+            <span>Model *</span>
+            <input
+              value={model}
+              onChange={(event) => setModel(event.target.value)}
+              placeholder="Golf"
+              required
+            />
+          </label>
+
+          <label className="form-field form-field-wide">
+            <span>Version</span>
+            <input
+              value={version}
+              onChange={(event) =>
+                setVersion(event.target.value)
+              }
+              placeholder="1.6 TDI"
+            />
+          </label>
+        </div>
+
+        {error && (
+          <div className="form-error">
+            {error}
+          </div>
+          )}
+
+        <div className="form-actions">
+          <Link href="/stock" className="secondary-button">
+            Cancel
+          </Link>
+
+          <button
+            type="submit"
+            className="primary-button"
+            disabled={saving}
+          >
+            {saving ? "Creating..." : "Create vehicle"}
+          </button>
+        </div>
+      </form>
+    </main>
+  );
+}
