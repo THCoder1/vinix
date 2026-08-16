@@ -22,9 +22,27 @@ export function acquisitionTotal(acquisition: {
 
 export function totalInvestment(
   acquisition: Parameters<typeof acquisitionTotal>[0],
-  expenses: Array<{ amount: Money }>
+  expenses: Array<{
+    amount: Money;
+    taxAmount?: Money;
+  }>
 ) {
-  return acquisitionTotal(acquisition) + expenses.reduce((sum, e) => sum + n(e.amount), 0);
+  return acquisitionTotal(acquisition) + expenseTotal(expenses);
+}
+
+export function expenseTotal(
+  expenses: Array<{
+    amount: Money;
+    taxAmount?: Money;
+  }>
+) {
+  return expenses.reduce(
+    (sum, expense) =>
+      sum +
+      n(expense.amount) +
+      n(expense.taxAmount),
+    0
+  );
 }
 
 export function grossProfit(totalCost: Money, salePrice: Money) {
@@ -34,4 +52,15 @@ export function grossProfit(totalCost: Money, salePrice: Money) {
 export function grossMargin(totalCost: Money, salePrice: Money) {
   const sale = n(salePrice);
   return sale === 0 ? 0 : (grossProfit(totalCost, salePrice) / sale) * 100;
+}
+
+export function returnOnInvestment(
+  totalCost: Money,
+  salePrice: Money
+) {
+  const cost = n(totalCost);
+
+  return cost === 0
+    ? 0
+    : (grossProfit(totalCost, salePrice) / cost) * 100;
 }

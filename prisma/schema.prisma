@@ -113,7 +113,7 @@ model Vehicle {
 
 model Acquisition {
   id               String    @id @default(cuid())
-  vehicleId        String
+  vehicleId        String    @unique
   supplier         String?
   auctionHouse     String?
   invoiceNumber    String?

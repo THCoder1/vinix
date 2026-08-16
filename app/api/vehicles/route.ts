@@ -57,14 +57,39 @@ export async function GET() {
       orderBy: {
         createdAt: "desc",
       },
-      include: {
-        photos: {
-          orderBy: {
-            sortOrder: "asc",
-          },
-          take: 1,
-        },
-      },
+include: {
+  photos: {
+    orderBy: {
+      sortOrder: "asc",
+    },
+    take: 1,
+  },
+
+  acquisitions: {
+    select: {
+      purchasePrice: true,
+      auctionFee: true,
+      transportCost: true,
+      taxCost: true,
+      otherCost: true,
+    },
+  },
+
+  expenses: {
+    select: {
+      amount: true,
+      taxAmount: true,
+    },
+  },
+
+  sales: {
+    select: {
+      salePrice: true,
+      saleDate: true,
+      paymentStatus: true,
+    },
+  },
+},
     });
 
     return NextResponse.json({

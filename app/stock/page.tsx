@@ -2,6 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import {
+  acquisitionTotal,
+  expenseTotal,
+  totalInvestment,
+  grossProfit,
+  grossMargin,
+  returnOnInvestment,
+} from "@/lib/calculations";
 
 type VehiclePhoto = {
   id: string;
@@ -22,6 +30,24 @@ type Vehicle = {
   status: string;
   location: string | null;
   photos: VehiclePhoto[];
+  acquisitions: {
+  purchasePrice: string;
+  auctionFee: string;
+  transportCost: string;
+  taxCost: string;
+  otherCost: string;
+}[];
+
+expenses: {
+  amount: string;
+  taxAmount: string;
+}[];
+
+sales: {
+  salePrice: string;
+  saleDate: string | null;
+  paymentStatus: string;
+}[];
 };
 
 const statusLabels: Record<string, string> = {
@@ -71,7 +97,7 @@ export default function StockPage() {
     loadVehicles();
   }, []);
 
-  const filteredVehicles = useMemo(() => {
+    const filteredVehicles = useMemo(() => {
     const query = search.trim().toLowerCase();
 
     return vehicles.filter((vehicle) => {
@@ -88,6 +114,67 @@ export default function StockPage() {
       return matchesSearch && matchesStatus;
     });
   }, [vehicles, search, status]);
+
+  const stockKpis = useMemo(() => {
+  const unsoldVehicles = vehicles.filter(
+    (vehicle) => vehicle.status !== "SOLD"
+  );
+
+  const soldVehicles = vehicles.filter(
+    (vehicle) => vehicle.status === "SOLD"
+  );
+
+  const stockInvestment = unsoldVehicles.reduce(
+    (sum, vehicle) => {
+      const acquisition = vehicle.acquisitions[0] ?? null;
+
+      return (
+        sum +
+        (acquisition
+          ? totalInvestment(
+              acquisition,
+              vehicle.expenses
+            )
+          : expenseTotal(vehicle.expenses))
+      );
+    },
+    0
+  );
+
+  const realizedProfit = soldVehicles.reduce(
+    (sum, vehicle) => {
+      const acquisition = vehicle.acquisitions[0] ?? null;
+      const sale = vehicle.sales[0] ?? null;
+
+      if (!acquisition || !sale) {
+        return sum;
+      }
+
+      const trueCost = totalInvestment(
+        acquisition,
+        vehicle.expenses
+      );
+
+      return sum + grossProfit(
+        trueCost,
+        sale.salePrice
+      );
+    },
+    0
+  );
+
+  const averageInvestment =
+    unsoldVehicles.length > 0
+      ? stockInvestment / unsoldVehicles.length
+      : 0;
+
+  return {
+    stockCount: unsoldVehicles.length,
+    stockInvestment,
+    realizedProfit,
+    averageInvestment,
+  };
+}, [vehicles]);
 
   return (
     <main className="main">
@@ -133,6 +220,43 @@ export default function StockPage() {
         </span>
       </div>
 
+      <section className="stock-kpis">
+  <div>
+    <span>Stock vehicles</span>
+    <strong>{stockKpis.stockCount}</strong>
+  </div>
+
+  <div>
+    <span>Capital invested</span>
+    <strong>
+      {new Intl.NumberFormat("es-ES", {
+        style: "currency",
+        currency: "EUR",
+      }).format(stockKpis.stockInvestment)}
+    </strong>
+  </div>
+
+  <div>
+    <span>Realized profit</span>
+    <strong>
+      {new Intl.NumberFormat("es-ES", {
+        style: "currency",
+        currency: "EUR",
+      }).format(stockKpis.realizedProfit)}
+    </strong>
+  </div>
+
+  <div>
+    <span>Avg. investment</span>
+    <strong>
+      {new Intl.NumberFormat("es-ES", {
+        style: "currency",
+        currency: "EUR",
+      }).format(stockKpis.averageInvestment)}
+    </strong>
+  </div>
+</section>
+
       {loading && (
         <div className="empty-state">
           Loading stock...
@@ -154,6 +278,34 @@ export default function StockPage() {
       {!loading && !error && filteredVehicles.length > 0 && (
         <section className="stock-grid">
           {filteredVehicles.map((vehicle) => {
+            const acquisition = vehicle.acquisitions[0] ?? null;
+            const sale = vehicle.sales[0] ?? null;
+
+            const acquisitionCost = acquisition
+              ? acquisitionTotal(acquisition)
+              : 0;
+
+            const expensesCost = expenseTotal(vehicle.expenses);
+
+            const trueCost = acquisition
+              ? totalInvestment(acquisition, vehicle.expenses)
+              : expensesCost;
+
+            const salePrice = sale
+              ? Number(sale.salePrice)
+              : 0;
+
+            const profit = sale
+              ? grossProfit(trueCost, salePrice)
+              : 0;
+
+            const margin = sale
+              ? grossMargin(trueCost, salePrice)
+              : 0;
+
+            const roi = sale
+              ? returnOnInvestment(trueCost, salePrice)
+              : 0;
             const primaryPhoto =
               vehicle.photos.find((photo) => photo.isPrimary) ||
               vehicle.photos[0];
@@ -218,6 +370,61 @@ export default function StockPage() {
                           : "—"}
                       </strong>
                     </div>
+                  </div>
+
+                  <div className="vehicle-financials">
+                    <div>
+                      <span>True cost</span>
+                      <strong>
+                        {acquisition
+                          ? new Intl.NumberFormat("es-ES", {
+                              style: "currency",
+                              currency: "EUR",
+                            }).format(trueCost)
+                          : "—"}
+                      </strong>
+                    </div>
+
+                    {sale ? (
+                      <>
+                        <div>
+                          <span>Sale</span>
+                          <strong>
+                            {new Intl.NumberFormat("es-ES", {
+                              style: "currency",
+                              currency: "EUR",
+                            }).format(salePrice)}
+                          </strong>
+                        </div>
+
+                        <div>
+                          <span>Profit</span>
+                          <strong>
+                            {new Intl.NumberFormat("es-ES", {
+                              style: "currency",
+                              currency: "EUR",
+                            }).format(profit)}
+                          </strong>
+                        </div>
+                      </>
+                    ) : (
+                    <>
+                      <div>
+                        <span>Expenses</span>
+                        <strong>
+                          {new Intl.NumberFormat("es-ES", {
+                            style: "currency",
+                            currency: "EUR",
+                          }).format(expensesCost)}
+                        </strong>
+                      </div>
+
+                      <div>
+                        <span>Potential</span>
+                        <strong>—</strong>
+                      </div>
+                    </>
+                  )}
                   </div>
 
                   <Link

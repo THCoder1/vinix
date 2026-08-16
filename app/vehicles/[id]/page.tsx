@@ -2,6 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import {
+  acquisitionTotal,
+  expenseTotal,
+  totalInvestment,
+  grossProfit,
+  grossMargin,
+  returnOnInvestment,
+} from "@/lib/calculations";
 
 type Vehicle = {
   id: string;
@@ -24,6 +32,36 @@ type Vehicle = {
     storagePath: string;
     isPrimary: boolean;
   }[];
+  acquisitions: {
+  id: string;
+  supplier: string | null;
+  auctionHouse: string | null;
+  invoiceNumber: string | null;
+  invoiceDate: string | null;
+  purchasePrice: string;
+  auctionFee: string;
+  transportCost: string;
+  taxCost: string;
+  otherCost: string;
+  currency: string;
+}[];
+expenses: {
+  id: string;
+  category: string;
+  description: string;
+  supplier: string | null;
+  invoiceNumber: string | null;
+  amount: string;
+  taxAmount: string;
+  date: string;
+}[];
+sales: {
+  id: string;
+  saleDate: string | null;
+  salePrice: string;
+  invoiceNumber: string | null;
+  paymentStatus: string;
+}[];
   events: {
     id: string;
     eventType: string;
@@ -78,50 +116,113 @@ export default function VehiclePage({
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
+  const [expenseForm, setExpenseForm] = useState({
+    category: "MECHANICAL",
+    description: "",
+    supplier: "",
+    invoiceNumber: "",
+    amount: "",
+    taxAmount: "",
+    date: "",
+});
 
-    async function loadVehicle() {
-      try {
-        const { id } = await params;
+const [savingExpense, setSavingExpense] = useState(false);
 
-        const response = await fetch(`/api/vehicles/${id}`);
+  async function updateStatus(newStatus: string) {
+  if (!vehicle || newStatus === vehicle.status) {
+    return;
+  }
 
-        if (!response.ok) {
-          throw new Error("Vehicle not found.");
-        }
+  setUpdatingStatus(true);
+  setError("");
 
-        const data = await response.json();
+  try {
+    const response = await fetch(`/api/vehicles/${vehicle.id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        status: newStatus,
+      }),
+    });
 
-        if (!data.success) {
-          throw new Error(data.error || "Unable to load vehicle.");
-        }
+    const data = await response.json();
 
-        if (!cancelled) {
-          setVehicle(data.vehicle);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Unable to load vehicle."
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
+    if (!response.ok || !data.success) {
+      throw new Error(
+        data.error || "Unable to update vehicle status."
+      );
     }
 
-    loadVehicle();
+    setVehicle((current) =>
+      current
+        ? {
+            ...current,
+            status: newStatus,
+          }
+        : current
+    );
+  } catch (err) {
+    setError(
+      err instanceof Error
+        ? err.message
+        : "Unable to update vehicle status."
+    );
+  } finally {
+    setUpdatingStatus(false);
+  }
+}
 
-    return () => {
-      cancelled = true;
-    };
-  }, [params]);
+useEffect(() => {
+  let cancelled = false;
+
+  async function loadVehicle() {
+    try {
+      const { id } = await params;
+
+      const response = await fetch(`/api/vehicles/${id}`);
+
+      if (!response.ok) {
+        throw new Error("Vehicle not found.");
+      }
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(
+          data.error || "Unable to load vehicle."
+        );
+      }
+
+      if (!cancelled) {
+        setVehicle(data.vehicle);
+      }
+    } catch (err) {
+      if (!cancelled) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to load vehicle."
+        );
+      }
+    } finally {
+      if (!cancelled) {
+        setLoading(false);
+      }
+    }
+  }
+
+  loadVehicle();
+
+  return () => {
+    cancelled = true;
+  };
+}, [params]);
+
 
   if (loading) {
     return (
@@ -145,6 +246,23 @@ export default function VehiclePage({
     );
   }
 
+const acquisition = vehicle.acquisitions[0] ?? null;
+const acquisitionCost = acquisition
+  ? acquisitionTotal(acquisition)
+  : 0;
+
+const trueCost = acquisition
+  ? totalInvestment(acquisition, vehicle.expenses)
+  : 0;
+
+const totalExpenses = expenseTotal(vehicle.expenses);
+
+const formatMoney = (value: number) =>
+  new Intl.NumberFormat("es-ES", {
+    style: "currency",
+    currency: acquisition?.currency || "EUR",
+  }).format(value);
+
   const primaryPhoto =
     vehicle.photos.find((photo) => photo.isPrimary) ||
     vehicle.photos[0];
@@ -164,11 +282,20 @@ export default function VehiclePage({
               {vehicle.make} {vehicle.model}
             </h1>
 
-            <span
+            <select
               className={`status-badge status-${vehicle.status.toLowerCase()}`}
+              value={vehicle.status}
+              disabled={updatingStatus}
+              onChange={(event) => updateStatus(event.target.value)}
             >
-              {statusLabels[vehicle.status] || vehicle.status}
-            </span>
+              <option value="PURCHASED">Purchased</option>
+              <option value="IN_PREPARATION">In preparation</option>
+              <option value="READY_FOR_SALE">Ready for sale</option>
+              <option value="RESERVED">Reserved</option>
+              <option value="SOLD">Sold</option>
+              <option value="HOLD">On hold</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
           </div>
 
           {vehicle.version && (
@@ -262,6 +389,176 @@ export default function VehiclePage({
             </div>
           </section>
 
+          <section className="workspace-card financial-summary">
+  <div className="section-heading">
+    <div>
+      <div className="eyebrow">Financial overview</div>
+      <h2>Vehicle profitability</h2>
+    </div>
+  </div>
+
+  <div className="financial-summary-grid">
+    <div>
+      <span>Acquisition</span>
+      <strong>{formatMoney(acquisitionCost)}</strong>
+    </div>
+
+    <div>
+      <span>Expenses</span>
+      <strong>{formatMoney(totalExpenses)}</strong>
+    </div>
+
+    <div>
+      <span>True cost</span>
+      <strong>{formatMoney(trueCost)}</strong>
+    </div>
+
+    <div>
+      <span>Sale price</span>
+      <strong>
+        {vehicle.sales.length > 0
+          ? formatMoney(Number(vehicle.sales[0].salePrice))
+          : "—"}
+      </strong>
+    </div>
+
+    <div className="financial-profit">
+      <span>Gross profit</span>
+      <strong>
+        {vehicle.sales.length > 0
+          ? formatMoney(
+              Number(vehicle.sales[0].salePrice) - trueCost
+            )
+          : "—"}
+      </strong>
+    </div>
+  </div>
+</section>
+
+          <section className="workspace-card">
+  <div className="section-heading">
+    <div>
+      <div className="eyebrow">Acquisition</div>
+      <h2>Purchase cost</h2>
+    </div>
+  </div>
+
+  {vehicle.acquisitions.length === 0 ? (
+    <p className="muted-text">
+      No acquisition recorded.
+    </p>
+  ) : (
+    (() => {
+
+      const total =
+        Number(acquisition.purchasePrice) +
+        Number(acquisition.auctionFee) +
+        Number(acquisition.transportCost) +
+        Number(acquisition.taxCost) +
+        Number(acquisition.otherCost);
+
+      const totalExpenses = vehicle.expenses.reduce(
+        (sum, expense) =>
+          sum +
+          Number(expense.amount) +
+          Number(expense.taxAmount),
+        0
+      );
+
+      const trueCost = total + totalExpenses;
+
+      const formatMoney = (value: number) =>
+        new Intl.NumberFormat("es-ES", {
+          style: "currency",
+          currency: acquisition.currency || "EUR",
+        }).format(value);
+
+      return (
+        <>
+          <div className="acquisition-meta">
+            <strong>
+              {acquisition.auctionHouse || "Supplier"}
+            </strong>
+
+            {acquisition.invoiceNumber && (
+              <span>
+                Invoice {acquisition.invoiceNumber}
+              </span>
+            )}
+
+            {acquisition.invoiceDate && (
+              <span>
+                {formatDate(acquisition.invoiceDate)}
+              </span>
+            )}
+          </div>
+
+          <div className="cost-list">
+            <div className="cost-row">
+              <span>Purchase price</span>
+              <strong>
+                {formatMoney(
+                  Number(acquisition.purchasePrice)
+                )}
+              </strong>
+            </div>
+
+            <div className="cost-row">
+              <span>Auction fee</span>
+              <strong>
+                {formatMoney(
+                  Number(acquisition.auctionFee)
+                )}
+              </strong>
+            </div>
+
+            <div className="cost-row">
+              <span>Transport</span>
+              <strong>
+                {formatMoney(
+                  Number(acquisition.transportCost)
+                )}
+              </strong>
+            </div>
+
+            <div className="cost-row">
+              <span>Tax</span>
+              <strong>
+                {formatMoney(
+                  Number(acquisition.taxCost)
+                )}
+              </strong>
+            </div>
+
+            <div className="cost-row">
+              <span>Other</span>
+              <strong>
+                {formatMoney(
+                  Number(acquisition.otherCost)
+                )}
+              </strong>
+            </div>
+
+            <div className="cost-row cost-total">
+              <span>Total acquisition</span>
+              <strong>{formatMoney(acquisitionCost)}</strong>
+            </div>
+          </div>
+          <div className="true-cost">
+              <div>
+                <span>True vehicle cost</span>
+                <small>Acquisition + all expenses</small>
+              </div>
+
+              <strong>{formatMoney(trueCost)}</strong>
+            </div>
+        </>
+      );
+    })()
+  )}
+  
+</section>
+
           <section className="workspace-card">
             <div className="section-heading">
               <div>
@@ -327,6 +624,385 @@ export default function VehiclePage({
               sale price and profit will appear here.
             </p>
           </section>
+
+          <section className="workspace-card">
+            <div className="section-heading">
+            <div>
+              <div className="eyebrow">Expenses</div>
+              <h2>Additional costs</h2>
+            </div>
+
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() => setShowExpenseForm((current) => !current)}
+  >
+    {showExpenseForm ? "Cancel" : "+ Add expense"}
+  </button>
+</div>
+
+{showExpenseForm && (
+  <form
+    className="expense-form"
+    onSubmit={async (event) => {
+      event.preventDefault();
+
+      if (!vehicle) {
+        return;
+      }
+
+      setSavingExpense(true);
+      setError("");
+
+      try {
+        const response = await fetch(
+          `/api/vehicles/${vehicle.id}/expenses`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              category: expenseForm.category,
+              description: expenseForm.description,
+              supplier: expenseForm.supplier || undefined,
+              invoiceNumber:
+                expenseForm.invoiceNumber || undefined,
+              amount: Number(expenseForm.amount),
+              taxAmount: Number(expenseForm.taxAmount || 0),
+              date: expenseForm.date || undefined,
+            }),
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(
+            data.error || "Unable to create expense."
+          );
+        }
+
+        setVehicle((current) =>
+          current
+            ? {
+                ...current,
+                expenses: [data.expense, ...current.expenses],
+              }
+            : current
+        );
+
+        setExpenseForm({
+          category: "MECHANICAL",
+          description: "",
+          supplier: "",
+          invoiceNumber: "",
+          amount: "",
+          taxAmount: "",
+          date: "",
+        });
+
+        setShowExpenseForm(false);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to create expense."
+        );
+      } finally {
+        setSavingExpense(false);
+      }
+    }}
+  >
+    <div className="expense-form-grid">
+      <label>
+        Category
+        <select
+          value={expenseForm.category}
+          onChange={(event) =>
+            setExpenseForm((current) => ({
+              ...current,
+              category: event.target.value,
+            }))
+          }
+        >
+          <option value="MECHANICAL">Mechanical</option>
+          <option value="PARTS">Parts</option>
+          <option value="TYRES">Tyres</option>
+          <option value="BODYWORK">Bodywork</option>
+          <option value="PAINT">Paint</option>
+          <option value="DETAILING">Detailing</option>
+          <option value="ITV">ITV</option>
+          <option value="GESTORIA">Gestoria</option>
+          <option value="REGISTRATION">Registration</option>
+          <option value="TRANSPORT">Transport</option>
+          <option value="WARRANTY">Warranty</option>
+          <option value="OTHER">Other</option>
+        </select>
+      </label>
+
+      <label>
+        Description
+        <input
+          type="text"
+          value={expenseForm.description}
+          onChange={(event) =>
+            setExpenseForm((current) => ({
+              ...current,
+              description: event.target.value,
+            }))
+          }
+          required
+        />
+      </label>
+
+      <label>
+        Supplier
+        <input
+          type="text"
+          value={expenseForm.supplier}
+          onChange={(event) =>
+            setExpenseForm((current) => ({
+              ...current,
+              supplier: event.target.value,
+            }))
+          }
+        />
+      </label>
+
+      <label>
+        Invoice number
+        <input
+          type="text"
+          value={expenseForm.invoiceNumber}
+          onChange={(event) =>
+            setExpenseForm((current) => ({
+              ...current,
+              invoiceNumber: event.target.value,
+            }))
+          }
+        />
+      </label>
+
+      <label>
+        Amount
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={expenseForm.amount}
+          onChange={(event) =>
+            setExpenseForm((current) => ({
+              ...current,
+              amount: event.target.value,
+            }))
+          }
+          required
+        />
+      </label>
+
+      <label>
+        VAT / Tax
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={expenseForm.taxAmount}
+          onChange={(event) =>
+            setExpenseForm((current) => ({
+              ...current,
+              taxAmount: event.target.value,
+            }))
+          }
+        />
+      </label>
+
+      <label>
+        Date
+        <input
+          type="date"
+          value={expenseForm.date}
+          onChange={(event) =>
+            setExpenseForm((current) => ({
+              ...current,
+              date: event.target.value,
+            }))
+          }
+        />
+      </label>
+    </div>
+
+    <div className="expense-form-actions">
+      <button
+        type="submit"
+        className="primary-button"
+        disabled={savingExpense}
+      >
+        {savingExpense ? "Saving..." : "Save expense"}
+      </button>
+    </div>
+  </form>
+)}
+
+  {vehicle.expenses.length === 0 ? (
+    <p className="muted-text">
+      No expenses recorded.
+    </p>
+  ) : (
+    <>
+      <div className="expense-list">
+        {vehicle.expenses.map((expense) => {
+          const total =
+            Number(expense.amount) +
+            Number(expense.taxAmount);
+
+          return (
+            <div
+              key={expense.id}
+              className="expense-item"
+            >
+              <div className="expense-main">
+                <div className="expense-title">
+                  {expense.description}
+                </div>
+
+                <div className="expense-meta">
+                  <span>{expense.category}</span>
+
+                  {expense.supplier && (
+                    <span>{expense.supplier}</span>
+                  )}
+
+                  {expense.invoiceNumber && (
+                    <span>
+                      Invoice {expense.invoiceNumber}
+                    </span>
+                  )}
+
+                  <span>
+                    {formatDate(expense.date)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="expense-amount">
+                {new Intl.NumberFormat("es-ES", {
+                  style: "currency",
+                  currency: "EUR",
+                }).format(total)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="expense-total">
+        <span>Total expenses</span>
+
+        <strong>
+          {new Intl.NumberFormat("es-ES", {
+            style: "currency",
+            currency: "EUR",
+          }).format(
+            vehicle.expenses.reduce(
+              (total, expense) =>
+                total +
+                Number(expense.amount) +
+                Number(expense.taxAmount),
+              0
+            )
+          )}
+        </strong>
+      </div>
+    </>
+  )}
+</section>
+
+<section className="workspace-card">
+  <div className="section-heading">
+    <div>
+      <div className="eyebrow">Sale</div>
+      <h2>Sale information</h2>
+    </div>
+  </div>
+
+  {vehicle.sales.length === 0 ? (
+    <p className="muted-text">
+      Vehicle has not been sold.
+    </p>
+  ) : (
+    (() => {
+      const sale = vehicle.sales[0];
+
+const profit = grossProfit(
+  trueCost,
+  sale.salePrice
+);
+
+const margin = grossMargin(
+  trueCost,
+  sale.salePrice
+);
+
+const roi = returnOnInvestment(
+  trueCost,
+  sale.salePrice
+);
+
+      return (
+        <>
+          <div className="sale-summary">
+            <div>
+              <span>Sale price</span>
+              <strong>
+                {formatMoney(Number(sale.salePrice))}
+              </strong>
+            </div>
+
+            <div>
+              <span>Gross profit</span>
+              <strong>
+                {formatMoney(profit)}
+              </strong>
+            </div>
+
+            <div>
+              <span>Gross margin</span>
+              <strong>
+                {margin.toFixed(1)}%
+              </strong>
+            </div>
+
+            <div>
+              <span>ROI</span>
+              <strong>
+                {roi.toFixed(1)}%
+              </strong>
+            </div>
+          </div>
+
+          <div className="sale-meta">
+            {sale.saleDate && (
+              <span>
+                Sold {formatDate(sale.saleDate)}
+              </span>
+            )}
+
+            {sale.invoiceNumber && (
+              <span>
+                Invoice {sale.invoiceNumber}
+              </span>
+            )}
+
+            <span>
+              Payment: {sale.paymentStatus}
+            </span>
+          </div>
+        </>
+      );
+    })()
+  )}
+</section>
 
           <section className="workspace-card future-card">
             <div className="eyebrow">Coming next</div>

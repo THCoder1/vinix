@@ -669,3 +669,386 @@ h1 {
     width: 100%;
   }
 }
+
+/* ─────────────────────────────
+   Acquisition
+───────────────────────────── */
+
+.acquisition-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+}
+
+.acquisition-meta strong {
+  font-size: 15px;
+}
+
+.acquisition-meta span {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.cost-list {
+  border-top: 1px solid #e5eaf0;
+}
+
+.cost-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 13px 0;
+  border-bottom: 1px solid #e5eaf0;
+}
+
+.cost-row span {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.cost-row strong {
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.cost-row.cost-total {
+  margin-top: 4px;
+  padding-top: 17px;
+  border-bottom: 0;
+}
+
+.cost-row.cost-total span,
+.cost-row.cost-total strong {
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* ─────────────────────────────
+   Expenses
+───────────────────────────── */
+
+.expense-list {
+  border-top: 1px solid #e5eaf0;
+}
+
+.expense-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid #e5eaf0;
+}
+
+.expense-main {
+  min-width: 0;
+}
+
+.expense-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.expense-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.expense-amount {
+  flex-shrink: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.expense-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+  padding-top: 18px;
+}
+
+.expense-total span {
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.expense-total strong {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+@media (max-width: 700px) {
+  .expense-item {
+    align-items: flex-start;
+  }
+
+  .expense-amount {
+    font-size: 14px;
+  }
+}
+
+/* ─────────────────────────────
+   True Vehicle Cost
+───────────────────────────── */
+
+.true-cost {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 18px;
+  padding: 18px 20px;
+  border: 1px solid #d9e1eb;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.true-cost > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.true-cost span {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.true-cost small {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.true-cost strong {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+@media (max-width: 700px) {
+  .true-cost {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+/* ─────────────────────────────
+   Sale
+───────────────────────────── */
+
+.sale-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid #e5eaf0;
+  border-radius: 12px;
+  background: #e5eaf0;
+}
+
+.sale-summary > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 18px 20px;
+  background: #ffffff;
+}
+
+.sale-summary span {
+  font-size: 12px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.sale-summary strong {
+  font-size: 18px;
+  font-weight: 750;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.sale-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 16px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+@media (max-width: 1100px) {
+  .sale-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .sale-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─────────────────────────────
+   Financial Summary
+───────────────────────────── */
+
+.financial-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid #e5eaf0;
+  border-radius: 12px;
+  background: #e5eaf0;
+}
+
+.financial-summary-grid > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 18px;
+  background: #ffffff;
+}
+
+.financial-summary-grid span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.financial-summary-grid strong {
+  font-size: 17px;
+  font-weight: 750;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.financial-summary-grid .financial-profit {
+  background: #f8fafc;
+}
+
+.financial-summary-grid .financial-profit strong {
+  font-size: 20px;
+}
+
+@media (max-width: 1100px) {
+  .financial-summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .financial-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 500px) {
+  .financial-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─────────────────────────────
+   Stock Financials
+───────────────────────────── */
+
+.vehicle-financials {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 18px;
+  overflow: hidden;
+  border: 1px solid #e5eaf0;
+  border-radius: 10px;
+  background: #e5eaf0;
+}
+
+.vehicle-financials > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.vehicle-financials span {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.vehicle-financials strong {
+  font-size: 14px;
+  font-weight: 750;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+@media (max-width: 500px) {
+  .vehicle-financials {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─────────────────────────────
+   Stock KPIs
+───────────────────────────── */
+
+.stock-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin: 18px 0 24px;
+  overflow: hidden;
+  border: 1px solid #e5eaf0;
+  border-radius: 12px;
+  background: #e5eaf0;
+}
+
+.stock-kpis > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 20px;
+  background: #ffffff;
+}
+
+.stock-kpis span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.stock-kpis strong {
+  font-size: 20px;
+  font-weight: 750;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .stock-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 500px) {
+  .stock-kpis {
+    grid-template-columns: 1fr;
+  }
+}
