@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import {
   acquisitionTotal,
   expenseTotal,
@@ -25,6 +25,7 @@ type Vehicle = {
   transmission: string | null;
   colour: string | null;
   status: string;
+  allowedStatusTransitions: string[];
   location: string | null;
   photos: {
     id: string;
@@ -38,6 +39,7 @@ type Vehicle = {
   auctionHouse: string | null;
   invoiceNumber: string | null;
   invoiceDate: string | null;
+  approvedAt: string | null;
   purchasePrice: string;
   auctionFee: string;
   transportCost: string;
@@ -117,7 +119,17 @@ export default function VehiclePage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [approvingAcquisition, setApprovingAcquisition] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [showSaleForm, setShowSaleForm] = useState(false);
+  const [saleForm, setSaleForm] = useState({
+    salePrice: "",
+    saleDate: "",
+    invoiceNumber: "",
+    paymentStatus: "PENDING",
+  });
+  const [savingSale, setSavingSale] = useState(false);
+  const [saleError, setSaleError] = useState("");
 
   const [expenseForm, setExpenseForm] = useState({
     category: "MECHANICAL",
@@ -162,7 +174,9 @@ const [savingExpense, setSavingExpense] = useState(false);
       current
         ? {
             ...current,
-            status: newStatus,
+            status: data.vehicle.status,
+            allowedStatusTransitions:
+              data.vehicle.allowedStatusTransitions,
           }
         : current
     );
@@ -174,6 +188,136 @@ const [savingExpense, setSavingExpense] = useState(false);
     );
   } finally {
     setUpdatingStatus(false);
+  }
+}
+
+async function approveAcquisition() {
+  if (!vehicle || vehicle.acquisitions.length === 0) {
+    return;
+  }
+
+  setApprovingAcquisition(true);
+  setError("");
+
+  try {
+    const response = await fetch(
+      `/api/vehicles/${vehicle.id}/acquisition`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(
+        data.error || "Unable to approve acquisition."
+      );
+    }
+
+    setVehicle((current) => {
+      if (!current || current.acquisitions.length === 0) {
+        return current;
+      }
+
+      return {
+        ...current,
+        acquisitions: [
+          {
+            ...current.acquisitions[0],
+            approvedAt: data.acquisition.approvedAt,
+          },
+          ...current.acquisitions.slice(1),
+        ],
+      };
+    });
+  } catch (err) {
+    setError(
+      err instanceof Error
+        ? err.message
+        : "Unable to approve acquisition."
+    );
+  } finally {
+    setApprovingAcquisition(false);
+  }
+}
+
+async function submitSale(event: FormEvent<HTMLFormElement>) {
+  event.preventDefault();
+
+  if (!vehicle) {
+    return;
+  }
+
+  setSavingSale(true);
+  setSaleError("");
+
+  try {
+    const response = await fetch(
+      `/api/vehicles/${vehicle.id}/sale`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          saleDate: saleForm.saleDate || undefined,
+          salePrice: Number(saleForm.salePrice),
+          invoiceNumber: saleForm.invoiceNumber || undefined,
+          paymentStatus: saleForm.paymentStatus,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(
+        data.error || "Unable to record sale."
+      );
+    }
+
+    setVehicle((current) =>
+      current
+        ? {
+            ...current,
+            status: "SOLD",
+            sales: [data.sale],
+          }
+        : current
+    );
+
+    setSaleForm({
+      salePrice: "",
+      saleDate: "",
+      invoiceNumber: "",
+      paymentStatus: "PENDING",
+    });
+    setShowSaleForm(false);
+
+    const refreshedResponse = await fetch(
+      `/api/vehicles/${vehicle.id}`
+    );
+    const refreshedData = await refreshedResponse.json();
+
+    if (!refreshedResponse.ok || !refreshedData.success) {
+      throw new Error(
+        "Sale recorded, but vehicle details could not be refreshed."
+      );
+    }
+
+    setVehicle(refreshedData.vehicle);
+  } catch (err) {
+    setSaleError(
+      err instanceof Error
+        ? err.message
+        : "Unable to record sale."
+    );
+  } finally {
+    setSavingSale(false);
   }
 }
 
@@ -257,6 +401,19 @@ const trueCost = acquisition
 
 const totalExpenses = expenseTotal(vehicle.expenses);
 
+const isSaleEligibleStatus =
+  vehicle.status === "READY_FOR_SALE" ||
+  vehicle.status === "RESERVED";
+
+const canCreateSale =
+  isSaleEligibleStatus &&
+  Boolean(acquisition?.approvedAt) &&
+  vehicle.sales.length === 0;
+
+const salePrice = Number(saleForm.salePrice);
+const hasSalePrice =
+  Number.isFinite(salePrice) && salePrice > 0;
+
 const formatMoney = (value: number) =>
   new Intl.NumberFormat("es-ES", {
     style: "currency",
@@ -285,16 +442,20 @@ const formatMoney = (value: number) =>
             <select
               className={`status-badge status-${vehicle.status.toLowerCase()}`}
               value={vehicle.status}
-              disabled={updatingStatus}
+              disabled={
+                updatingStatus ||
+                vehicle.allowedStatusTransitions.length === 0
+              }
               onChange={(event) => updateStatus(event.target.value)}
             >
-              <option value="PURCHASED">Purchased</option>
-              <option value="IN_PREPARATION">In preparation</option>
-              <option value="READY_FOR_SALE">Ready for sale</option>
-              <option value="RESERVED">Reserved</option>
-              <option value="SOLD">Sold</option>
-              <option value="HOLD">On hold</option>
-              <option value="CANCELLED">Cancelled</option>
+              <option value={vehicle.status}>
+                {statusLabels[vehicle.status] || vehicle.status}
+              </option>
+              {vehicle.allowedStatusTransitions.map((status) => (
+                <option key={status} value={status}>
+                  {statusLabels[status] || status}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -435,21 +596,45 @@ const formatMoney = (value: number) =>
   </div>
 </section>
 
-          <section className="workspace-card">
+<section className="workspace-card">
   <div className="section-heading">
     <div>
       <div className="eyebrow">Acquisition</div>
       <h2>Purchase cost</h2>
     </div>
+
+    {acquisition && (
+      <span
+        className={
+          acquisition.approvedAt
+            ? "status-badge status-ready_for_sale"
+            : "status-badge status-purchased"
+        }
+      >
+        {acquisition.approvedAt
+          ? "Approved"
+          : "Pending approval"}
+      </span>
+    )}
   </div>
 
   {vehicle.acquisitions.length === 0 ? (
-    <p className="muted-text">
-      No acquisition recorded.
-    </p>
+    <div>
+      <p className="muted-text">
+        No acquisition recorded.
+      </p>
+
+      <div className="form-actions">
+        <Link
+          href={`/vehicles/${vehicle.id}/acquisition`}
+          className="primary-button"
+        >
+          Add acquisition
+        </Link>
+      </div>
+    </div>
   ) : (
     (() => {
-
       const total =
         Number(acquisition.purchasePrice) +
         Number(acquisition.auctionFee) +
@@ -479,6 +664,12 @@ const formatMoney = (value: number) =>
             <strong>
               {acquisition.auctionHouse || "Supplier"}
             </strong>
+
+            {acquisition.supplier && (
+              <span>
+                {acquisition.supplier}
+              </span>
+            )}
 
             {acquisition.invoiceNumber && (
               <span>
@@ -541,25 +732,70 @@ const formatMoney = (value: number) =>
 
             <div className="cost-row cost-total">
               <span>Total acquisition</span>
-              <strong>{formatMoney(acquisitionCost)}</strong>
+              <strong>
+                {formatMoney(acquisitionCost)}
+              </strong>
             </div>
           </div>
+
           <div className="true-cost">
+            <div>
+              <span>True vehicle cost</span>
+              <small>
+                Acquisition + all expenses
+              </small>
+            </div>
+
+            <strong>
+              {formatMoney(trueCost)}
+            </strong>
+          </div>
+
+          {acquisition.approvedAt ? (
+            <div className="acquisition-approved">
               <div>
-                <span>True vehicle cost</span>
-                <small>Acquisition + all expenses</small>
+                <strong>
+                  Acquisition approved
+                </strong>
+
+                <small>
+                  Approved{" "}
+                  {formatDateTime(
+                    acquisition.approvedAt
+                  )}
+                </small>
+              </div>
+            </div>
+          ) : (
+            <div className="acquisition-approval">
+              <div>
+                <strong>
+                  Acquisition pending approval
+                </strong>
+
+                <p>
+                  Review the acquisition costs before
+                  approving this vehicle.
+                </p>
               </div>
 
-              <strong>{formatMoney(trueCost)}</strong>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={approveAcquisition}
+                disabled={approvingAcquisition}
+              >
+                {approvingAcquisition
+                  ? "Approving..."
+                  : "Approve acquisition"}
+              </button>
             </div>
+          )}
         </>
       );
     })()
   )}
-  
-</section>
-
-          <section className="workspace-card">
+</section>          <section className="workspace-card">
             <div className="section-heading">
               <div>
                 <div className="eyebrow">Vehicle history</div>
@@ -918,19 +1154,124 @@ const formatMoney = (value: number) =>
   )}
 </section>
 
+<section className="workspace-card preparation-card">
+  <div className="section-heading">
+    <div>
+      <div className="eyebrow">Preparation</div>
+      <h2>Vehicle preparation</h2>
+    </div>
+
+    <span
+      className={`status-badge status-${vehicle.status.toLowerCase()}`}
+    >
+      {statusLabels[vehicle.status] || vehicle.status}
+    </span>
+  </div>
+
+  <div className="preparation-grid">
+    <div>
+      <span>Current stage</span>
+      <strong>
+        {statusLabels[vehicle.status] || vehicle.status}
+      </strong>
+    </div>
+
+    <div>
+      <span>Recorded costs</span>
+      <strong>{formatMoney(totalExpenses)}</strong>
+    </div>
+
+    <div>
+      <span>Expenses</span>
+      <strong>{vehicle.expenses.length}</strong>
+    </div>
+
+    <div>
+      <span>Last activity</span>
+      <strong>
+        {vehicle.events.length > 0
+          ? formatDateTime(vehicle.events[0].createdAt)
+          : "No activity"}
+      </strong>
+    </div>
+  </div>
+
+  {vehicle.status === "IN_PREPARATION" && (
+    <div className="preparation-action">
+      <div>
+        <strong>Preparation in progress</strong>
+        <p>
+          Record the work and costs below, then mark the vehicle
+          ready when preparation is complete.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        className="primary-button"
+        onClick={() => updateStatus("READY_FOR_SALE")}
+        disabled={updatingStatus}
+      >
+        {updatingStatus
+          ? "Updating..."
+          : "Mark ready for sale"}
+      </button>
+    </div>
+  )}
+
+  {vehicle.status === "READY_FOR_SALE" && (
+    <div className="preparation-action">
+      <div>
+        <strong>Vehicle ready for sale</strong>
+        <p>
+          If additional preparation is required, return the
+          vehicle to preparation.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        className="secondary-button"
+        onClick={() => updateStatus("IN_PREPARATION")}
+        disabled={updatingStatus}
+      >
+        {updatingStatus
+          ? "Updating..."
+          : "Return to preparation"}
+      </button>
+    </div>
+  )}
+</section>
+
 <section className="workspace-card">
   <div className="section-heading">
     <div>
       <div className="eyebrow">Sale</div>
       <h2>Sale information</h2>
     </div>
+
+    {canCreateSale && (
+      <button
+        type="button"
+        className="secondary-button"
+        onClick={() => {
+          setShowSaleForm((current) => !current);
+          setSaleError("");
+        }}
+        disabled={savingSale}
+      >
+        {showSaleForm ? "Cancel" : "Record sale"}
+      </button>
+    )}
   </div>
 
-  {vehicle.sales.length === 0 ? (
-    <p className="muted-text">
-      Vehicle has not been sold.
+  {saleError && (
+    <p className="muted-text" role="alert">
+      {saleError}
     </p>
-  ) : (
+  )}
+
+  {vehicle.sales.length > 0 ? (
     (() => {
       const sale = vehicle.sales[0];
 
@@ -1001,6 +1342,146 @@ const roi = returnOnInvestment(
         </>
       );
     })()
+  ) : !isSaleEligibleStatus ? (
+    <p className="muted-text">
+      Vehicle must be ready for sale or reserved before it can be sold.
+    </p>
+  ) : !acquisition ? (
+    <p className="muted-text">
+      An acquisition record is required before this vehicle can be sold.
+    </p>
+  ) : !acquisition.approvedAt ? (
+    <p className="muted-text">
+      Acquisition approval is required before this vehicle can be sold.
+    </p>
+  ) : showSaleForm ? (
+    <form onSubmit={submitSale}>
+      <div className="form-grid">
+        <label className="form-field form-field-wide">
+          <span>Sale price *</span>
+          <input
+            type="number"
+            min="0.01"
+            step="0.01"
+            value={saleForm.salePrice}
+            onChange={(event) =>
+              setSaleForm((current) => ({
+                ...current,
+                salePrice: event.target.value,
+              }))
+            }
+            required
+          />
+        </label>
+
+        <label className="form-field form-field-wide">
+          <span>Sale date</span>
+          <input
+            type="date"
+            value={saleForm.saleDate}
+            onChange={(event) =>
+              setSaleForm((current) => ({
+                ...current,
+                saleDate: event.target.value,
+              }))
+            }
+          />
+        </label>
+
+        <label className="form-field form-field-wide">
+          <span>Invoice number</span>
+          <input
+            type="text"
+            value={saleForm.invoiceNumber}
+            onChange={(event) =>
+              setSaleForm((current) => ({
+                ...current,
+                invoiceNumber: event.target.value,
+              }))
+            }
+          />
+        </label>
+
+        <label className="form-field form-field-wide">
+          <span>Payment status</span>
+          <select
+            value={saleForm.paymentStatus}
+            onChange={(event) =>
+              setSaleForm((current) => ({
+                ...current,
+                paymentStatus: event.target.value,
+              }))
+            }
+          >
+            <option value="PENDING">Pending</option>
+            <option value="PARTIAL">Partial</option>
+            <option value="PAID">Paid</option>
+            <option value="REFUNDED">Refunded</option>
+          </select>
+        </label>
+      </div>
+
+      {hasSalePrice && (
+        <>
+          <div className="eyebrow">Profitability preview</div>
+          <div className="sale-summary">
+            <div>
+              <span>True vehicle cost</span>
+              <strong>{formatMoney(trueCost)}</strong>
+            </div>
+
+            <div>
+              <span>Gross profit</span>
+              <strong>
+                {formatMoney(
+                  grossProfit(trueCost, salePrice)
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>Gross margin</span>
+              <strong>
+                {grossMargin(trueCost, salePrice).toFixed(1)}%
+              </strong>
+            </div>
+
+            <div>
+              <span>ROI</span>
+              <strong>
+                {returnOnInvestment(
+                  trueCost,
+                  salePrice
+                ).toFixed(1)}%
+              </strong>
+            </div>
+          </div>
+        </>
+      )}
+
+      <div className="form-actions">
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => setShowSaleForm(false)}
+          disabled={savingSale}
+        >
+          Cancel
+        </button>
+
+        <button
+          type="submit"
+          className="primary-button"
+          disabled={savingSale}
+        >
+          {savingSale ? "Saving..." : "Save sale"}
+        </button>
+      </div>
+    </form>
+  ) : (
+    <p className="muted-text">
+      Record the completed sale when the transaction is ready.
+    </p>
   )}
 </section>
 

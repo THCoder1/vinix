@@ -71,6 +71,7 @@ enum PaymentStatus {
 
 enum VehicleEventType {
   VEHICLE_CREATED
+  ACQUISITION_CREATED
   AUCTION_INVOICE_UPLOADED
   ACQUISITION_APPROVED
   EXPENSE_ADDED
@@ -118,6 +119,7 @@ model Acquisition {
   auctionHouse     String?
   invoiceNumber    String?
   invoiceDate      DateTime?
+  approvedAt       DateTime?
   purchasePrice    Decimal   @db.Decimal(12, 2)
   auctionFee       Decimal   @default(0) @db.Decimal(12, 2)
   transportCost    Decimal   @default(0) @db.Decimal(12, 2)

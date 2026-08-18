@@ -3,10 +3,18 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
+import { isSaleEligibleVehicleStatus } from "@/lib/vehicle-lifecycle";
 
 const saleSchema = z.object({
-  saleDate: z.string().optional(),
-  salePrice: z.number().nonnegative(),
+  saleDate: z
+    .string()
+    .trim()
+    .refine(
+      (value) => !Number.isNaN(new Date(value).getTime()),
+      "Sale date must be valid"
+    )
+    .optional(),
+  salePrice: z.number().positive(),
   invoiceNumber: z.string().trim().optional(),
   paymentStatus: z
     .enum(["PENDING", "PARTIAL", "PAID", "REFUNDED"])
@@ -33,6 +41,13 @@ export async function POST(
       select: {
         id: true,
         vin: true,
+        status: true,
+        acquisitions: {
+          select: {
+            id: true,
+            approvedAt: true,
+          },
+        },
       },
     });
 
@@ -65,6 +80,38 @@ export async function POST(
       );
     }
 
+    if (!isSaleEligibleVehicleStatus(vehicle.status)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "This vehicle is not eligible for sale.",
+        },
+        { status: 409 }
+      );
+    }
+
+    const acquisition = vehicle.acquisitions[0];
+
+    if (!acquisition) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "An acquisition record is required before selling this vehicle.",
+        },
+        { status: 409 }
+      );
+    }
+
+    if (!acquisition.approvedAt) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "The acquisition must be approved before selling this vehicle.",
+        },
+        { status: 409 }
+      );
+    }
+
     const body = await request.json();
 
     const result = saleSchema.safeParse(body);
@@ -82,33 +129,39 @@ export async function POST(
 
     const data = result.data;
 
-    const sale = await db.sale.create({
-      data: {
-        vehicleId,
-        saleDate: data.saleDate
-          ? new Date(data.saleDate)
-          : null,
-        salePrice: new Prisma.Decimal(data.salePrice),
-        invoiceNumber: data.invoiceNumber || null,
-        paymentStatus: data.paymentStatus,
-      },
-    });
+    const saleDate = data.saleDate
+      ? new Date(data.saleDate)
+      : new Date();
 
-    await db.vehicle.update({
-  where: {
-    id: vehicleId,
-  },
-  data: {
-    status: "SOLD",
-  },
-});
+    const sale = await db.$transaction(async (tx) => {
+      const createdSale = await tx.sale.create({
+        data: {
+          vehicleId,
+          saleDate,
+          salePrice: new Prisma.Decimal(data.salePrice),
+          invoiceNumber: data.invoiceNumber || null,
+          paymentStatus: data.paymentStatus,
+        },
+      });
 
-    await db.vehicleEvent.create({
-      data: {
-        vehicleId,
-        eventType: "VEHICLE_SOLD",
-        description: `Vehicle sold for ${data.salePrice.toFixed(2)}`,
-      },
+      await tx.vehicle.update({
+        where: {
+          id: vehicleId,
+        },
+        data: {
+          status: "SOLD",
+        },
+      });
+
+      await tx.vehicleEvent.create({
+        data: {
+          vehicleId,
+          eventType: "VEHICLE_SOLD",
+          description: `Vehicle sold for ${data.salePrice.toFixed(2)}`,
+        },
+      });
+
+      return createdSale;
     });
 
     return NextResponse.json(

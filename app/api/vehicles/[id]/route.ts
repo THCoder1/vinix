@@ -3,6 +3,10 @@ import { VehicleStatus } from "@prisma/client";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
+import {
+  getSelectableVehicleStatusTransitions,
+  isValidVehicleStatusTransition,
+} from "@/lib/vehicle-lifecycle";
 
 type RouteContext = {
   params: Promise<{
@@ -67,7 +71,11 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      vehicle,
+      vehicle: {
+        ...vehicle,
+        allowedStatusTransitions:
+          getSelectableVehicleStatusTransitions(vehicle.status),
+      },
     });
   } catch (error) {
     console.error("VINIX vehicle detail error:", error);
@@ -129,33 +137,56 @@ export async function PATCH(
 
     const newStatus = result.data.status;
 
-    if (newStatus === "SOLD") {
-  const sale = await db.sale.findUnique({
-    where: {
-      vehicleId,
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  if (!sale) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: "A sale record is required before marking the vehicle as SOLD.",
-      },
-      { status: 400 }
-    );
-  }
-}
-
     if (newStatus === vehicle.status) {
       return NextResponse.json({
         success: true,
-        vehicle,
+        vehicle: {
+          ...vehicle,
+          allowedStatusTransitions:
+            getSelectableVehicleStatusTransitions(vehicle.status),
+        },
         changed: false,
       });
+    }
+
+    const sale = await db.sale.findUnique({
+      where: {
+        vehicleId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (sale) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "A vehicle with a sale record must remain SOLD.",
+        },
+        { status: 409 }
+      );
+    }
+
+    if (newStatus === VehicleStatus.SOLD) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Vehicles can only be marked as SOLD through the sale workflow.",
+        },
+        { status: 409 }
+      );
+    }
+
+    if (!isValidVehicleStatusTransition(vehicle.status, newStatus)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid vehicle status transition.",
+          details: `Cannot move vehicle from ${vehicle.status} to ${newStatus}.`,
+        },
+        { status: 409 }
+      );
     }
 
     const updatedVehicle = await db.$transaction(async (tx) => {
@@ -171,8 +202,14 @@ export async function PATCH(
       await tx.vehicleEvent.create({
         data: {
           vehicleId,
-          eventType: "STATUS_CHANGED",
-          description: `Status changed from ${vehicle.status} to ${newStatus}`,
+          eventType:
+            newStatus === VehicleStatus.RESERVED
+              ? "VEHICLE_RESERVED"
+              : "STATUS_CHANGED",
+          description:
+            newStatus === VehicleStatus.RESERVED
+              ? `Vehicle reserved from ${vehicle.status}`
+              : `Status changed from ${vehicle.status} to ${newStatus}`,
         },
       });
 
@@ -182,7 +219,11 @@ export async function PATCH(
     return NextResponse.json({
       success: true,
       changed: true,
-      vehicle: updatedVehicle,
+      vehicle: {
+        ...updatedVehicle,
+        allowedStatusTransitions:
+          getSelectableVehicleStatusTransitions(updatedVehicle.status),
+      },
     });
   } catch (error) {
     console.error("VINIX vehicle status update error:", error);

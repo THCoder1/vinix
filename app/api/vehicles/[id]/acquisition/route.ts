@@ -10,7 +10,7 @@ const acquisitionSchema = z.object({
   invoiceNumber: z.string().trim().optional(),
   invoiceDate: z.string().optional(),
 
-  purchasePrice: z.number().nonnegative(),
+  purchasePrice: z.number().positive(),
   auctionFee: z.number().nonnegative().default(0),
   transportCost: z.number().nonnegative().default(0),
   taxCost: z.number().nonnegative().default(0),
@@ -34,7 +34,10 @@ export async function POST(
 
     const vehicle = await db.vehicle.findUnique({
       where: { id: vehicleId },
-      select: { id: true, vin: true },
+      select: {
+        id: true,
+        vin: true,
+      },
     });
 
     if (!vehicle) {
@@ -63,6 +66,7 @@ export async function POST(
     }
 
     const body = await request.json();
+
     const result = acquisitionSchema.safeParse(body);
 
     if (!result.success) {
@@ -78,31 +82,47 @@ export async function POST(
 
     const data = result.data;
 
-    const acquisition = await db.acquisition.create({
-      data: {
-        vehicleId,
-        supplier: data.supplier || null,
-        auctionHouse: data.auctionHouse || null,
-        invoiceNumber: data.invoiceNumber || null,
-        invoiceDate: data.invoiceDate
-          ? new Date(data.invoiceDate)
-          : null,
-        purchasePrice: new Prisma.Decimal(data.purchasePrice),
-        auctionFee: new Prisma.Decimal(data.auctionFee),
-        transportCost: new Prisma.Decimal(data.transportCost),
-        taxCost: new Prisma.Decimal(data.taxCost),
-        otherCost: new Prisma.Decimal(data.otherCost),
-        currency: data.currency.toUpperCase(),
-      },
-    });
+    const acquisition = await db.$transaction(
+      async (tx) => {
+        const createdAcquisition = await tx.acquisition.create({
+          data: {
+            vehicleId,
+            supplier: data.supplier || null,
+            auctionHouse: data.auctionHouse || null,
+            invoiceNumber: data.invoiceNumber || null,
+            invoiceDate: data.invoiceDate
+              ? new Date(data.invoiceDate)
+              : null,
+            purchasePrice: new Prisma.Decimal(
+              data.purchasePrice
+            ),
+            auctionFee: new Prisma.Decimal(
+              data.auctionFee
+            ),
+            transportCost: new Prisma.Decimal(
+              data.transportCost
+            ),
+            taxCost: new Prisma.Decimal(
+              data.taxCost
+            ),
+            otherCost: new Prisma.Decimal(
+              data.otherCost
+            ),
+            currency: data.currency.toUpperCase(),
+          },
+        });
 
-    await db.vehicleEvent.create({
-      data: {
-        vehicleId,
-        eventType: "ACQUISITION_APPROVED",
-        description: `Acquisition recorded for ${vehicle.vin}`,
-      },
-    });
+        await tx.vehicleEvent.create({
+          data: {
+            vehicleId,
+            eventType: "ACQUISITION_CREATED",
+            description: `Acquisition recorded for ${vehicle.vin}`,
+          },
+        });
+
+        return createdAcquisition;
+      }
+    );
 
     return NextResponse.json(
       {
@@ -125,12 +145,100 @@ export async function POST(
       );
     }
 
-    console.error("VINIX acquisition creation error:", error);
+    console.error(
+      "VINIX acquisition creation error:",
+      error
+    );
 
     return NextResponse.json(
       {
         success: false,
         error: "Unable to create acquisition.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(
+  _request: Request,
+  context: RouteContext
+) {
+  try {
+    const { id: vehicleId } = await context.params;
+
+    const acquisition = await db.acquisition.findUnique({
+      where: {
+        vehicleId,
+      },
+      include: {
+        vehicle: {
+          select: {
+            vin: true,
+          },
+        },
+      },
+    });
+
+    if (!acquisition) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Acquisition not found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    if (acquisition.approvedAt) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "This acquisition is already approved.",
+        },
+        { status: 409 }
+      );
+    }
+
+    const approvedAt = new Date();
+
+    const updatedAcquisition = await db.$transaction(
+      async (tx) => {
+        const updated = await tx.acquisition.update({
+          where: {
+            id: acquisition.id,
+          },
+          data: {
+            approvedAt,
+          },
+        });
+
+        await tx.vehicleEvent.create({
+          data: {
+            vehicleId,
+            eventType: "ACQUISITION_APPROVED",
+            description: `Acquisition approved for ${acquisition.vehicle.vin}`,
+          },
+        });
+
+        return updated;
+      }
+    );
+
+    return NextResponse.json({
+      success: true,
+      acquisition: updatedAcquisition,
+    });
+  } catch (error) {
+    console.error(
+      "VINIX acquisition approval error:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Unable to approve acquisition.",
       },
       { status: 500 }
     );
