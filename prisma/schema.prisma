@@ -69,6 +69,13 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum UserRole {
+  ADMIN
+  MANAGER
+  SALES
+  VIEWER
+}
+
 enum VehicleEventType {
   VEHICLE_CREATED
   ACQUISITION_CREATED
@@ -83,74 +90,86 @@ enum VehicleEventType {
 }
 
 model Vehicle {
-  id                 String          @id @default(cuid())
-  vin                String          @unique
-  registration       String?
-  make               String
-  model              String
-  version            String?
-  firstRegistration  DateTime?
-  mileage            Int?
-  fuel               FuelType?
-  engine             String?
-  transmission       String?
-  colour             String?
-  status             VehicleStatus   @default(PURCHASED)
-  location           String?
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  id                String        @id @default(cuid())
+  vin               String        @unique
+  registration      String?
+  make              String
+  model             String
+  version           String?
+  firstRegistration DateTime?
+  mileage           Int?
+  fuel              FuelType?
+  engine            String?
+  transmission      String?
+  colour            String?
+  status            VehicleStatus @default(PURCHASED)
+  location          String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
-  acquisitions       Acquisition[]
-  expenses           Expense[]
-  documents          Document[]
-  sales              Sale[]
-  events             VehicleEvent[]
-  photos             VehiclePhoto[]
+  acquisitions Acquisition[]
+  expenses     Expense[]
+  documents    Document[]
+  sales        Sale[]
+  events       VehicleEvent[]
+  photos       VehiclePhoto[]
 
   @@index([status])
   @@index([make, model])
   @@index([registration])
 }
 
-model Acquisition {
-  id               String    @id @default(cuid())
-  vehicleId        String    @unique
-  supplier         String?
-  auctionHouse     String?
-  invoiceNumber    String?
-  invoiceDate      DateTime?
-  approvedAt       DateTime?
-  purchasePrice    Decimal   @db.Decimal(12, 2)
-  auctionFee       Decimal   @default(0) @db.Decimal(12, 2)
-  transportCost    Decimal   @default(0) @db.Decimal(12, 2)
-  taxCost          Decimal   @default(0) @db.Decimal(12, 2)
-  otherCost        Decimal   @default(0) @db.Decimal(12, 2)
-  currency         String    @default("EUR")
-  documentId       String?   @unique
-  createdAt        DateTime  @default(now())
+model User {
+  id         String   @id @default(cuid())
+  authUserId String   @unique
+  email      String   @unique
+  name       String?
+  role       UserRole @default(SALES)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  vehicle          Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  document         Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  events VehicleEvent[]
+}
+
+model Acquisition {
+  id            String    @id @default(cuid())
+  vehicleId     String    @unique
+  supplier      String?
+  auctionHouse  String?
+  invoiceNumber String?
+  invoiceDate   DateTime?
+  approvedAt    DateTime?
+  purchasePrice Decimal   @db.Decimal(12, 2)
+  auctionFee    Decimal   @default(0) @db.Decimal(12, 2)
+  transportCost Decimal   @default(0) @db.Decimal(12, 2)
+  taxCost       Decimal   @default(0) @db.Decimal(12, 2)
+  otherCost     Decimal   @default(0) @db.Decimal(12, 2)
+  currency      String    @default("EUR")
+  documentId    String?   @unique
+  createdAt     DateTime  @default(now())
+
+  vehicle  Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  document Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
 
   @@index([vehicleId])
   @@index([invoiceNumber])
 }
 
 model Expense {
-  id             String          @id @default(cuid())
-  vehicleId      String
-  category       ExpenseCategory
-  description    String
-  supplier       String?
-  invoiceNumber  String?
-  amount         Decimal         @db.Decimal(12, 2)
-  taxAmount      Decimal         @default(0) @db.Decimal(12, 2)
-  date           DateTime        @default(now())
-  documentId     String?         @unique
-  createdAt      DateTime        @default(now())
+  id            String          @id @default(cuid())
+  vehicleId     String
+  category      ExpenseCategory
+  description   String
+  supplier      String?
+  invoiceNumber String?
+  amount        Decimal         @db.Decimal(12, 2)
+  taxAmount     Decimal         @default(0) @db.Decimal(12, 2)
+  date          DateTime        @default(now())
+  documentId    String?         @unique
+  createdAt     DateTime        @default(now())
 
-  vehicle        Vehicle         @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  document       Document?       @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  vehicle  Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  document Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
 
   @@index([vehicleId])
   @@index([category])
@@ -158,20 +177,20 @@ model Expense {
 }
 
 model Document {
-  id             String      @id @default(cuid())
-  vehicleId      String
-  type           DocumentType
-  filename       String
-  storagePath    String
-  mimeType       String
-  source         String?
-  ocrStatus      OcrStatus   @default(PENDING)
-  uploadedAt     DateTime    @default(now())
+  id          String       @id @default(cuid())
+  vehicleId   String
+  type        DocumentType
+  filename    String
+  storagePath String
+  mimeType    String
+  source      String?
+  ocrStatus   OcrStatus    @default(PENDING)
+  uploadedAt  DateTime     @default(now())
 
-  vehicle        Vehicle     @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  acquisition    Acquisition?
-  expense        Expense?
-  sale           Sale?
+  vehicle     Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  acquisition Acquisition?
+  expense     Expense?
+  sale        Sale?
 
   @@index([vehicleId])
   @@index([type])
@@ -179,17 +198,17 @@ model Document {
 }
 
 model Sale {
-  id              String        @id @default(cuid())
-  vehicleId       String        @unique
-  saleDate        DateTime?
-  salePrice       Decimal       @db.Decimal(12, 2)
-  invoiceNumber   String?
-  paymentStatus   PaymentStatus @default(PENDING)
-  documentId      String?       @unique
-  createdAt       DateTime      @default(now())
+  id            String        @id @default(cuid())
+  vehicleId     String        @unique
+  saleDate      DateTime?
+  salePrice     Decimal       @db.Decimal(12, 2)
+  invoiceNumber String?
+  paymentStatus PaymentStatus @default(PENDING)
+  documentId    String?       @unique
+  createdAt     DateTime      @default(now())
 
-  vehicle         Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  document        Document?     @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  vehicle  Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  document Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
 
   @@index([saleDate])
 }
@@ -202,9 +221,11 @@ model VehicleEvent {
   userId      String?
   createdAt   DateTime         @default(now())
 
-  vehicle     Vehicle          @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([vehicleId, createdAt])
+  @@index([userId])
 }
 
 model VehiclePhoto {
@@ -216,8 +237,7 @@ model VehiclePhoto {
   isPrimary   Boolean  @default(false)
   createdAt   DateTime @default(now())
 
-  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@index([vehicleId])
   @@index([vehicleId, sortOrder])

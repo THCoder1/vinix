@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
+import { requirePermission } from "@/lib/auth";
 
 const acquisitionSchema = z.object({
   supplier: z.string().trim().optional(),
@@ -29,6 +30,12 @@ export async function POST(
   request: Request,
   context: RouteContext
 ) {
+  const auth = await requirePermission("CREATE_ACQUISITION");
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   try {
     const { id: vehicleId } = await context.params;
 
@@ -84,39 +91,41 @@ export async function POST(
 
     const acquisition = await db.$transaction(
       async (tx) => {
-        const createdAcquisition = await tx.acquisition.create({
-          data: {
-            vehicleId,
-            supplier: data.supplier || null,
-            auctionHouse: data.auctionHouse || null,
-            invoiceNumber: data.invoiceNumber || null,
-            invoiceDate: data.invoiceDate
-              ? new Date(data.invoiceDate)
-              : null,
-            purchasePrice: new Prisma.Decimal(
-              data.purchasePrice
-            ),
-            auctionFee: new Prisma.Decimal(
-              data.auctionFee
-            ),
-            transportCost: new Prisma.Decimal(
-              data.transportCost
-            ),
-            taxCost: new Prisma.Decimal(
-              data.taxCost
-            ),
-            otherCost: new Prisma.Decimal(
-              data.otherCost
-            ),
-            currency: data.currency.toUpperCase(),
-          },
-        });
+        const createdAcquisition =
+          await tx.acquisition.create({
+            data: {
+              vehicleId,
+              supplier: data.supplier || null,
+              auctionHouse: data.auctionHouse || null,
+              invoiceNumber: data.invoiceNumber || null,
+              invoiceDate: data.invoiceDate
+                ? new Date(data.invoiceDate)
+                : null,
+              purchasePrice: new Prisma.Decimal(
+                data.purchasePrice
+              ),
+              auctionFee: new Prisma.Decimal(
+                data.auctionFee
+              ),
+              transportCost: new Prisma.Decimal(
+                data.transportCost
+              ),
+              taxCost: new Prisma.Decimal(
+                data.taxCost
+              ),
+              otherCost: new Prisma.Decimal(
+                data.otherCost
+              ),
+              currency: data.currency.toUpperCase(),
+            },
+          });
 
         await tx.vehicleEvent.create({
           data: {
             vehicleId,
             eventType: "ACQUISITION_CREATED",
             description: `Acquisition recorded for ${vehicle.vin}`,
+            userId: auth.user.id,
           },
         });
 
@@ -164,6 +173,14 @@ export async function PATCH(
   _request: Request,
   context: RouteContext
 ) {
+  const auth = await requirePermission(
+    "APPROVE_ACQUISITION"
+  );
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   try {
     const { id: vehicleId } = await context.params;
 
@@ -204,20 +221,22 @@ export async function PATCH(
 
     const updatedAcquisition = await db.$transaction(
       async (tx) => {
-        const updated = await tx.acquisition.update({
-          where: {
-            id: acquisition.id,
-          },
-          data: {
-            approvedAt,
-          },
-        });
+        const updated =
+          await tx.acquisition.update({
+            where: {
+              id: acquisition.id,
+            },
+            data: {
+              approvedAt,
+            },
+          });
 
         await tx.vehicleEvent.create({
           data: {
             vehicleId,
             eventType: "ACQUISITION_APPROVED",
             description: `Acquisition approved for ${acquisition.vehicle.vin}`,
+            userId: auth.user.id,
           },
         });
 

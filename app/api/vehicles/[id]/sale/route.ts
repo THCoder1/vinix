@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
+import { requirePermission } from "@/lib/auth";
 import { isSaleEligibleVehicleStatus } from "@/lib/vehicle-lifecycle";
 
 const saleSchema = z.object({
@@ -10,14 +11,23 @@ const saleSchema = z.object({
     .string()
     .trim()
     .refine(
-      (value) => !Number.isNaN(new Date(value).getTime()),
+      (value) =>
+        !Number.isNaN(new Date(value).getTime()),
       "Sale date must be valid"
     )
     .optional(),
+
   salePrice: z.number().positive(),
+
   invoiceNumber: z.string().trim().optional(),
+
   paymentStatus: z
-    .enum(["PENDING", "PARTIAL", "PAID", "REFUNDED"])
+    .enum([
+      "PENDING",
+      "PARTIAL",
+      "PAID",
+      "REFUNDED",
+    ])
     .default("PENDING"),
 });
 
@@ -31,6 +41,12 @@ export async function POST(
   request: Request,
   context: RouteContext
 ) {
+  const auth = await requirePermission("CREATE_SALE");
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   try {
     const { id: vehicleId } = await context.params;
 
@@ -61,14 +77,15 @@ export async function POST(
       );
     }
 
-    const existingSale = await db.sale.findUnique({
-      where: {
-        vehicleId,
-      },
-      select: {
-        id: true,
-      },
-    });
+    const existingSale =
+      await db.sale.findUnique({
+        where: {
+          vehicleId,
+        },
+        select: {
+          id: true,
+        },
+      });
 
     if (existingSale) {
       return NextResponse.json(
@@ -80,7 +97,11 @@ export async function POST(
       );
     }
 
-    if (!isSaleEligibleVehicleStatus(vehicle.status)) {
+    if (
+      !isSaleEligibleVehicleStatus(
+        vehicle.status
+      )
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -90,13 +111,15 @@ export async function POST(
       );
     }
 
-    const acquisition = vehicle.acquisitions[0];
+    const acquisition =
+      vehicle.acquisitions[0];
 
     if (!acquisition) {
       return NextResponse.json(
         {
           success: false,
-          error: "An acquisition record is required before selling this vehicle.",
+          error:
+            "An acquisition record is required before selling this vehicle.",
         },
         { status: 409 }
       );
@@ -106,7 +129,8 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-          error: "The acquisition must be approved before selling this vehicle.",
+          error:
+            "The acquisition must be approved before selling this vehicle.",
         },
         { status: 409 }
       );
@@ -133,36 +157,44 @@ export async function POST(
       ? new Date(data.saleDate)
       : new Date();
 
-    const sale = await db.$transaction(async (tx) => {
-      const createdSale = await tx.sale.create({
-        data: {
-          vehicleId,
-          saleDate,
-          salePrice: new Prisma.Decimal(data.salePrice),
-          invoiceNumber: data.invoiceNumber || null,
-          paymentStatus: data.paymentStatus,
-        },
-      });
+    const sale = await db.$transaction(
+      async (tx) => {
+        const createdSale =
+          await tx.sale.create({
+            data: {
+              vehicleId,
+              saleDate,
+              salePrice: new Prisma.Decimal(
+                data.salePrice
+              ),
+              invoiceNumber:
+                data.invoiceNumber || null,
+              paymentStatus:
+                data.paymentStatus,
+            },
+          });
 
-      await tx.vehicle.update({
-        where: {
-          id: vehicleId,
-        },
-        data: {
-          status: "SOLD",
-        },
-      });
+        await tx.vehicle.update({
+          where: {
+            id: vehicleId,
+          },
+          data: {
+            status: "SOLD",
+          },
+        });
 
-      await tx.vehicleEvent.create({
-        data: {
-          vehicleId,
-          eventType: "VEHICLE_SOLD",
-          description: `Vehicle sold for ${data.salePrice.toFixed(2)}`,
-        },
-      });
+        await tx.vehicleEvent.create({
+          data: {
+            vehicleId,
+            eventType: "VEHICLE_SOLD",
+            description: `Vehicle sold for ${data.salePrice.toFixed(2)}`,
+            userId: auth.user.id,
+          },
+        });
 
-      return createdSale;
-    });
+        return createdSale;
+      }
+    );
 
     return NextResponse.json(
       {

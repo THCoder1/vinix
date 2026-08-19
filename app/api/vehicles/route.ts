@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
+import { requirePermission } from "@/lib/auth";
 
 const createVehicleSchema = z.object({
   vin: z
@@ -36,18 +37,6 @@ const createVehicleSchema = z.object({
   transmission: z.string().trim().optional(),
   colour: z.string().trim().optional(),
 
-  status: z
-    .enum([
-      "PURCHASED",
-      "IN_PREPARATION",
-      "READY_FOR_SALE",
-      "RESERVED",
-      "SOLD",
-      "HOLD",
-      "CANCELLED",
-    ])
-    .optional(),
-
   location: z.string().trim().optional(),
 });
 
@@ -57,39 +46,36 @@ export async function GET() {
       orderBy: {
         createdAt: "desc",
       },
-include: {
-  photos: {
-    orderBy: {
-      sortOrder: "asc",
-    },
-    take: 1,
-  },
-
-  acquisitions: {
-    select: {
-      purchasePrice: true,
-      auctionFee: true,
-      transportCost: true,
-      taxCost: true,
-      otherCost: true,
-    },
-  },
-
-  expenses: {
-    select: {
-      amount: true,
-      taxAmount: true,
-    },
-  },
-
-  sales: {
-    select: {
-      salePrice: true,
-      saleDate: true,
-      paymentStatus: true,
-    },
-  },
-},
+      include: {
+        photos: {
+          orderBy: {
+            sortOrder: "asc",
+          },
+          take: 1,
+        },
+        acquisitions: {
+          select: {
+            purchasePrice: true,
+            auctionFee: true,
+            transportCost: true,
+            taxCost: true,
+            otherCost: true,
+          },
+        },
+        expenses: {
+          select: {
+            amount: true,
+            taxAmount: true,
+          },
+        },
+        sales: {
+          select: {
+            salePrice: true,
+            saleDate: true,
+            paymentStatus: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json({
@@ -110,6 +96,12 @@ include: {
 }
 
 export async function POST(request: Request) {
+  const auth = await requirePermission("CREATE_VEHICLE");
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   try {
     const body = await request.json();
 
@@ -119,7 +111,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid vehicle data",
+          error: "Invalid vehicle data.",
           details: result.error.flatten(),
         },
         { status: 400 }
@@ -128,32 +120,37 @@ export async function POST(request: Request) {
 
     const data = result.data;
 
-    const vehicle = await db.vehicle.create({
-      data: {
-        vin: data.vin,
-        registration: data.registration || null,
-        make: data.make,
-        model: data.model,
-        version: data.version || null,
-        firstRegistration: data.firstRegistration
-          ? new Date(data.firstRegistration)
-          : null,
-        mileage: data.mileage ?? null,
-        fuel: data.fuel,
-        engine: data.engine || null,
-        transmission: data.transmission || null,
-        colour: data.colour || null,
-        status: data.status ?? "PURCHASED",
-        location: data.location || null,
-      },
-    });
+    const vehicle = await db.$transaction(async (tx) => {
+      const createdVehicle = await tx.vehicle.create({
+        data: {
+          vin: data.vin,
+          registration: data.registration || null,
+          make: data.make,
+          model: data.model,
+          version: data.version || null,
+          firstRegistration: data.firstRegistration
+            ? new Date(data.firstRegistration)
+            : null,
+          mileage: data.mileage ?? null,
+          fuel: data.fuel,
+          engine: data.engine || null,
+          transmission: data.transmission || null,
+          colour: data.colour || null,
+          status: "PURCHASED",
+          location: data.location || null,
+        },
+      });
 
-    await db.vehicleEvent.create({
-      data: {
-        vehicleId: vehicle.id,
-        eventType: "VEHICLE_CREATED",
-        description: `Vehicle ${vehicle.vin} created`,
-      },
+      await tx.vehicleEvent.create({
+        data: {
+          vehicleId: createdVehicle.id,
+          eventType: "VEHICLE_CREATED",
+          description: `Vehicle ${createdVehicle.vin} created`,
+          userId: auth.user.id,
+        },
+      });
+
+      return createdVehicle;
     });
 
     return NextResponse.json(
