@@ -3,6 +3,7 @@ import { VehicleStatus } from "@prisma/client";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
+import { requirePermission } from "@/lib/auth";
 import {
   getSelectableVehicleStatusTransitions,
   isValidVehicleStatusTransition,
@@ -18,6 +19,12 @@ export async function GET(
   _request: Request,
   context: RouteContext
 ) {
+  const auth = await requirePermission("VIEW_STOCK");
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   try {
     const { id } = await context.params;
 
@@ -74,7 +81,9 @@ export async function GET(
       vehicle: {
         ...vehicle,
         allowedStatusTransitions:
-          getSelectableVehicleStatusTransitions(vehicle.status),
+          getSelectableVehicleStatusTransitions(
+            vehicle.status
+          ),
       },
     });
   } catch (error) {
@@ -98,6 +107,12 @@ export async function PATCH(
   request: Request,
   context: RouteContext
 ) {
+  const auth = await requirePermission("UPDATE_VEHICLE");
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   try {
     const { id: vehicleId } = await context.params;
 
@@ -143,7 +158,9 @@ export async function PATCH(
         vehicle: {
           ...vehicle,
           allowedStatusTransitions:
-            getSelectableVehicleStatusTransitions(vehicle.status),
+            getSelectableVehicleStatusTransitions(
+              vehicle.status
+            ),
         },
         changed: false,
       });
@@ -162,7 +179,8 @@ export async function PATCH(
       return NextResponse.json(
         {
           success: false,
-          error: "A vehicle with a sale record must remain SOLD.",
+          error:
+            "A vehicle with a sale record must remain SOLD.",
         },
         { status: 409 }
       );
@@ -172,13 +190,19 @@ export async function PATCH(
       return NextResponse.json(
         {
           success: false,
-          error: "Vehicles can only be marked as SOLD through the sale workflow.",
+          error:
+            "Vehicles can only be marked as SOLD through the sale workflow.",
         },
         { status: 409 }
       );
     }
 
-    if (!isValidVehicleStatusTransition(vehicle.status, newStatus)) {
+    if (
+      !isValidVehicleStatusTransition(
+        vehicle.status,
+        newStatus
+      )
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -189,32 +213,34 @@ export async function PATCH(
       );
     }
 
-    const updatedVehicle = await db.$transaction(async (tx) => {
-      const updated = await tx.vehicle.update({
-        where: {
-          id: vehicleId,
-        },
-        data: {
-          status: newStatus,
-        },
-      });
+    const updatedVehicle =
+      await db.$transaction(async (tx) => {
+        const updated = await tx.vehicle.update({
+          where: {
+            id: vehicleId,
+          },
+          data: {
+            status: newStatus,
+          },
+        });
 
-      await tx.vehicleEvent.create({
-        data: {
-          vehicleId,
-          eventType:
-            newStatus === VehicleStatus.RESERVED
-              ? "VEHICLE_RESERVED"
-              : "STATUS_CHANGED",
-          description:
-            newStatus === VehicleStatus.RESERVED
-              ? `Vehicle reserved from ${vehicle.status}`
-              : `Status changed from ${vehicle.status} to ${newStatus}`,
-        },
-      });
+        await tx.vehicleEvent.create({
+          data: {
+            vehicleId,
+            eventType:
+              newStatus === VehicleStatus.RESERVED
+                ? "VEHICLE_RESERVED"
+                : "STATUS_CHANGED",
+            description:
+              newStatus === VehicleStatus.RESERVED
+                ? `Vehicle reserved from ${vehicle.status}`
+                : `Status changed from ${vehicle.status} to ${newStatus}`,
+            userId: auth.user.id,
+          },
+        });
 
-      return updated;
-    });
+        return updated;
+      });
 
     return NextResponse.json({
       success: true,
@@ -222,11 +248,16 @@ export async function PATCH(
       vehicle: {
         ...updatedVehicle,
         allowedStatusTransitions:
-          getSelectableVehicleStatusTransitions(updatedVehicle.status),
+          getSelectableVehicleStatusTransitions(
+            updatedVehicle.status
+          ),
       },
     });
   } catch (error) {
-    console.error("VINIX vehicle status update error:", error);
+    console.error(
+      "VINIX vehicle status update error:",
+      error
+    );
 
     return NextResponse.json(
       {

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/auth";
 
+
 const createVehicleSchema = z.object({
   vin: z
     .string()
@@ -41,8 +42,13 @@ const createVehicleSchema = z.object({
 });
 
 export async function GET() {
-  try {
-    const vehicles = await db.vehicle.findMany({
+  const auth = await requirePermission("VIEW_STOCK");
+
+  if (auth.response) {
+    return auth.response;
+  }
+
+  try {    const vehicles = await db.vehicle.findMany({
       orderBy: {
         createdAt: "desc",
       },

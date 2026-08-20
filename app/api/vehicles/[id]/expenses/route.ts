@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
+import { requirePermission } from "@/lib/auth";
 
 const expenseSchema = z.object({
   category: z.enum([
@@ -46,6 +47,12 @@ export async function POST(
   request: Request,
   context: RouteContext
 ) {
+  const auth = await requirePermission("CREATE_EXPENSE");
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   try {
     const { id: vehicleId } = await context.params;
 
@@ -86,33 +93,35 @@ export async function POST(
 
     const data = result.data;
 
-    const expense = await db.expense.create({
-      data: {
-        vehicleId,
-        category: data.category,
-        description: data.description,
-        supplier: data.supplier || null,
-        invoiceNumber: data.invoiceNumber || null,
+    const expense = await db.$transaction(
+      async (tx) => {
+        const createdExpense = await tx.expense.create({
+          data: {
+            vehicleId,
+            category: data.category,
+            description: data.description,
+            supplier: data.supplier || null,
+            invoiceNumber: data.invoiceNumber || null,
+            amount: new Prisma.Decimal(data.amount),
+            taxAmount: new Prisma.Decimal(data.taxAmount),
+            date: data.date
+              ? new Date(data.date)
+              : new Date(),
+          },
+        });
 
-        amount: new Prisma.Decimal(data.amount),
+        await tx.vehicleEvent.create({
+          data: {
+            vehicleId,
+            eventType: "EXPENSE_ADDED",
+            description: `Expense added: ${data.description}`,
+            userId: auth.user.id,
+          },
+        });
 
-        taxAmount: new Prisma.Decimal(
-          data.taxAmount
-        ),
-
-        date: data.date
-          ? new Date(data.date)
-          : new Date(),
-      },
-    });
-
-    await db.vehicleEvent.create({
-      data: {
-        vehicleId,
-        eventType: "EXPENSE_ADDED",
-        description: `Expense added: ${data.description}`,
-      },
-    });
+        return createdExpense;
+      }
+    );
 
     return NextResponse.json(
       {

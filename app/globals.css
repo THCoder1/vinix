@@ -801,6 +801,145 @@ h1 {
 }
 
 /* ─────────────────────────────
+   Expense Form
+───────────────────────────── */
+
+.expense-form {
+  margin-top: 4px;
+}
+
+.expense-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+  margin-top: 20px;
+}
+
+.expense-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.expense-form-grid input,
+.expense-form-grid select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #d9e1eb;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f172a;
+  font: inherit;
+  outline: none;
+}
+
+.expense-form-grid input:focus,
+.expense-form-grid select:focus {
+  border-color: #0f172a;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
+}
+
+.expense-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e5eaf0;
+}
+
+/* ─────────────────────────────
+   Preparation
+───────────────────────────── */
+
+.preparation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.preparation-grid > div {
+  min-width: 0;
+  padding: 14px 0;
+  border-bottom: 1px solid #e5eaf0;
+}
+
+.preparation-grid span {
+  display: block;
+  margin-bottom: 6px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.preparation-grid strong {
+  display: block;
+  color: #0f172a;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.preparation-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 20px;
+  padding: 18px 20px;
+  border: 1px solid #d9e1eb;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.preparation-action > div {
+  min-width: 0;
+}
+
+.preparation-action strong {
+  display: block;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.preparation-action p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+@media (max-width: 700px) {
+  .expense-form-grid,
+  .preparation-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .expense-form-actions {
+    justify-content: stretch;
+  }
+
+  .expense-form-actions .primary-button {
+    width: 100%;
+  }
+
+  .preparation-action {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .preparation-action .primary-button,
+  .preparation-action .secondary-button {
+    width: 100%;
+  }
+}
+
+/* ─────────────────────────────
    True Vehicle Cost
 ───────────────────────────── */
 
