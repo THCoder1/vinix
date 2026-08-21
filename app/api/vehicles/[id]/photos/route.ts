@@ -126,54 +126,79 @@ export async function POST(
           upsert: false,
         });
 
-if (uploadError) {
-  console.error(
-    "VINIX vehicle photo upload error:",
-    {
-      message: uploadError.message,
-      name: uploadError.name,
-      statusCode: uploadError.statusCode,
-      error: uploadError,
+    if (uploadError) {
+      console.error(
+        "VINIX vehicle photo upload error:",
+        {
+          message: uploadError.message,
+          name: uploadError.name,
+          statusCode: uploadError.statusCode,
+          error: uploadError,
+        }
+      );
+
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            uploadError.message ||
+            "Unable to upload vehicle photo.",
+        },
+        { status: 500 }
+      );
     }
-  );
 
-  return NextResponse.json(
-    {
-      success: false,
-      error: uploadError.message || "Unable to upload vehicle photo.",
-    },
-    { status: 500 }
-  );
-}
-    const lastPhoto = await db.vehiclePhoto.findFirst({
-      where: {
-        vehicleId,
-      },
-      orderBy: {
-        sortOrder: "desc",
-      },
-      select: {
-        sortOrder: true,
-      },
-    });
+    try {
+      const photo = await db.$transaction(
+        async (tx) => {
+          const lastPhoto =
+            await tx.vehiclePhoto.findFirst({
+              where: {
+                vehicleId,
+              },
+              orderBy: {
+                sortOrder: "desc",
+              },
+              select: {
+                sortOrder: true,
+              },
+            });
 
-    const photo = await db.vehiclePhoto.create({
-      data: {
-        vehicleId,
-        storagePath,
-        url: null,
-        sortOrder: (lastPhoto?.sortOrder ?? -1) + 1,
-        isPrimary: !lastPhoto,
-      },
-    });
+          return tx.vehiclePhoto.create({
+            data: {
+              vehicleId,
+              storagePath,
+              url: null,
+              sortOrder:
+                (lastPhoto?.sortOrder ?? -1) + 1,
+              isPrimary: !lastPhoto,
+            },
+          });
+        }
+      );
 
-    return NextResponse.json(
-      {
-        success: true,
-        photo,
-      },
-      { status: 201 }
-    );
+      return NextResponse.json(
+        {
+          success: true,
+          photo,
+        },
+        { status: 201 }
+      );
+    } catch (databaseError) {
+      const { error: cleanupError } =
+        await supabase.storage
+          .from("vehicle-photos")
+          .remove([storagePath]);
+
+      if (cleanupError) {
+        console.error(
+          "VINIX vehicle photo storage cleanup error:",
+          cleanupError
+        );
+      }
+
+      throw databaseError;
+    }
   } catch (error) {
     console.error(
       "VINIX vehicle photo creation error:",

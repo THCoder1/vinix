@@ -351,7 +351,7 @@ useEffect(() => {
           loadedVehicle.photos.map(
             async (photo: Vehicle["photos"][number]) => {
               const photoResponse = await fetch(
-                `/api/vehicles/${id}/photos/${photo.id}/url`
+                `/api/vehicles/${id}/photos/url?photoId=${photo.id}`
               );
 
               if (!photoResponse.ok) {

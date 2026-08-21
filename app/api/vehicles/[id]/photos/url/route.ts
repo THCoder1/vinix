@@ -7,14 +7,13 @@ import { requirePermission } from "@/lib/auth";
 type RouteContext = {
   params: Promise<{
     id: string;
-    photoId: string;
   }>;
 };
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: RouteContext
 ) {
   const auth = await requirePermission("VIEW_STOCK");
@@ -24,7 +23,20 @@ export async function GET(
   }
 
   try {
-    const { id: vehicleId, photoId } = await context.params;
+    const { id: vehicleId } = await context.params;
+
+    const url = new URL(request.url);
+    const photoId = url.searchParams.get("photoId");
+
+    if (!photoId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Photo ID is required.",
+        },
+        { status: 400 }
+      );
+    }
 
     const photo = await db.vehiclePhoto.findFirst({
       where: {
