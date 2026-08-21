@@ -20,6 +20,17 @@ export const permissions = {
     UserRole.SALES,
   ],
 
+  UPLOAD_PHOTO: [
+  UserRole.ADMIN,
+  UserRole.MANAGER,
+  UserRole.SALES,
+  ],
+
+  UPLOAD_DOCUMENT: [
+  UserRole.ADMIN,
+  UserRole.MANAGER,
+  ],
+
   CREATE_ACQUISITION: [
     UserRole.ADMIN,
     UserRole.MANAGER,

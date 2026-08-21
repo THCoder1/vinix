@@ -342,8 +342,45 @@ useEffect(() => {
         );
       }
 
+      const loadedVehicle = data.vehicle;
+
+      if (
+        loadedVehicle.photos?.length > 0
+      ) {
+        const photosWithUrls = await Promise.all(
+          loadedVehicle.photos.map(
+            async (photo: Vehicle["photos"][number]) => {
+              const photoResponse = await fetch(
+                `/api/vehicles/${id}/photos/${photo.id}/url`
+              );
+
+              if (!photoResponse.ok) {
+                return photo;
+              }
+
+              const photoData =
+                await photoResponse.json();
+
+              if (
+                !photoData.success ||
+                !photoData.photo?.url
+              ) {
+                return photo;
+              }
+
+              return {
+                ...photo,
+                url: photoData.photo.url,
+              };
+            }
+          )
+        );
+
+        loadedVehicle.photos = photosWithUrls;
+      }
+
       if (!cancelled) {
-        setVehicle(data.vehicle);
+        setVehicle(loadedVehicle);
       }
     } catch (err) {
       if (!cancelled) {
@@ -366,7 +403,6 @@ useEffect(() => {
     cancelled = true;
   };
 }, [params]);
-
 
   if (loading) {
     return (
