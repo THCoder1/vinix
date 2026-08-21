@@ -5,14 +5,15 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/auth";
 
-
 const createVehicleSchema = z.object({
   vin: z
     .string()
     .trim()
     .min(5, "VIN is required")
     .max(30, "VIN is too long")
-    .transform((value) => value.toUpperCase().replace(/\s+/g, "")),
+    .transform((value) =>
+      value.toUpperCase().replace(/\s+/g, "")
+    ),
 
   registration: z.string().trim().optional(),
   make: z.string().trim().min(1, "Make is required"),
@@ -48,7 +49,8 @@ export async function GET() {
     return auth.response;
   }
 
-  try {    const vehicles = await db.vehicle.findMany({
+  try {
+    const vehicles = await db.vehicle.findMany({
       orderBy: {
         createdAt: "desc",
       },
