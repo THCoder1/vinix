@@ -26,10 +26,8 @@ export const permissions = {
   UserRole.SALES,
   ],
 
-  MANAGE_PHOTOS: [
+  DELETE_STOCK_PHOTO: [
   UserRole.ADMIN,
-  UserRole.MANAGER,
-  UserRole.SALES,
   ],
 
   UPLOAD_DOCUMENT: [

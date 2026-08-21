@@ -63,6 +63,26 @@ export async function POST(
       );
     }
 
+    const existingPhoto = await db.vehiclePhoto.findFirst({
+      where: {
+        vehicleId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (existingPhoto) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "A stock photo already exists for this vehicle. An ADMIN must delete it before a new photo can be uploaded.",
+        },
+        { status: 409 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get("file");
 
@@ -111,7 +131,8 @@ export async function POST(
     const extension = getExtension(file.type);
     const fileId = crypto.randomUUID();
 
-    const storagePath = `${vehicleId}/original/${fileId}.${extension}`;
+    const storagePath =
+      `${vehicleId}/original/${fileId}.${extension}`;
 
     const supabase = await createClient();
 
@@ -151,27 +172,26 @@ export async function POST(
     try {
       const photo = await db.$transaction(
         async (tx) => {
-          const lastPhoto =
-            await tx.vehiclePhoto.findFirst({
+          const photoCount =
+            await tx.vehiclePhoto.count({
               where: {
                 vehicleId,
               },
-              orderBy: {
-                sortOrder: "desc",
-              },
-              select: {
-                sortOrder: true,
-              },
             });
+
+          if (photoCount > 0) {
+            throw new Error(
+              "STOCK_PHOTO_ALREADY_EXISTS"
+            );
+          }
 
           return tx.vehiclePhoto.create({
             data: {
               vehicleId,
               storagePath,
               url: null,
-              sortOrder:
-                (lastPhoto?.sortOrder ?? -1) + 1,
-              isPrimary: !lastPhoto,
+              sortOrder: 0,
+              isPrimary: true,
             },
           });
         }
@@ -194,6 +214,21 @@ export async function POST(
         console.error(
           "VINIX vehicle photo storage cleanup error:",
           cleanupError
+        );
+      }
+
+      if (
+        databaseError instanceof Error &&
+        databaseError.message ===
+          "STOCK_PHOTO_ALREADY_EXISTS"
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "A stock photo already exists for this vehicle. An ADMIN must delete it before a new photo can be uploaded.",
+          },
+          { status: 409 }
         );
       }
 
