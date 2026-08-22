@@ -56,10 +56,6 @@ export async function GET(
         filename: true,
         mimeType: true,
         source: true,
-        ocrStatus: true,
-        ocrError: true,
-        ocrProcessedAt: true,
-        ocrReviewedAt: true,
         uploadedAt: true,
       },
     });

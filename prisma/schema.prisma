@@ -177,19 +177,14 @@ model Expense {
 }
 
 model Document {
-  id             String       @id @default(cuid())
-  vehicleId      String
-  type           DocumentType
-  filename       String
-  storagePath    String
-  mimeType       String
-  source         String?
-  ocrStatus      OcrStatus    @default(PENDING)
-  ocrData        Json?
-  ocrError       String?
-  ocrProcessedAt DateTime?
-  ocrReviewedAt  DateTime?
-  uploadedAt     DateTime     @default(now())
+  id          String       @id @default(cuid())
+  vehicleId   String
+  type        DocumentType
+  filename    String
+  storagePath String
+  mimeType    String
+  source      String?
+  uploadedAt  DateTime     @default(now())
 
   vehicle     Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   acquisition Acquisition?
@@ -198,7 +193,6 @@ model Document {
 
   @@index([vehicleId])
   @@index([type])
-  @@index([ocrStatus])
 }
 
 model Sale {
