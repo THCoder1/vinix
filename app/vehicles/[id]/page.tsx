@@ -10,6 +10,8 @@ import {
   grossMargin,
   returnOnInvestment,
 } from "@/lib/calculations";
+import VehicleDocuments from "@/components/vehicles/VehicleDocuments";
+import { useParams, useRouter } from "next/navigation";
 
 type Vehicle = {
   id: string;
@@ -115,6 +117,7 @@ export default function VehiclePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const router = useRouter();
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -502,9 +505,58 @@ const formatMoney = (value: number) =>
           )}
         </div>
 
-        <button className="secondary-button">
-          Edit vehicle
-        </button>
+        <div className="vehicle-header-actions">
+  <button
+    type="button"
+    className="secondary-button"
+  >
+    Edit vehicle
+  </button>
+
+  {vehicle.status !== "SOLD" && (
+    <button
+      type="button"
+      className="danger-button"
+      onClick={async () => {
+        const confirmed = window.confirm(
+          "Delete this vehicle permanently?\n\nThis will also remove its acquisition, expenses, documents, photos, sales records, and activity history.\n\nThis action cannot be undone."
+        );
+
+        if (!confirmed) {
+          return;
+        }
+
+        try {
+          const response = await fetch(
+            `/api/vehicles/${vehicle.id}`,
+            {
+              method: "DELETE",
+            }
+          );
+
+          const data = await response.json();
+
+          if (!response.ok || !data.success) {
+            throw new Error(
+              data.error || "Unable to delete vehicle."
+            );
+          }
+
+          router.push("/stock");
+          router.refresh();
+        } catch (err) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to delete vehicle."
+          );
+        }
+      }}
+    >
+      Delete vehicle
+    </button>
+  )}
+</div>
       </section>
 
       <section className="vehicle-workspace">
@@ -1521,14 +1573,7 @@ const roi = returnOnInvestment(
   )}
 </section>
 
-          <section className="workspace-card future-card">
-            <div className="eyebrow">Coming next</div>
-            <h3>Documents</h3>
-            <p>
-              Auction invoices, transport documents,
-              workshop invoices and other vehicle documents.
-            </p>
-          </section>
+          <VehicleDocuments vehicleId={vehicle.id} />
         </aside>
       </section>
     </main>

@@ -20,6 +20,10 @@ export const permissions = {
     UserRole.SALES,
   ],
 
+  DELETE_VEHICLE: [
+  UserRole.ADMIN,
+  ],
+
   UPLOAD_PHOTO: [
   UserRole.ADMIN,
   UserRole.MANAGER,

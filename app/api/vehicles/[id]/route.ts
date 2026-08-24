@@ -8,6 +8,7 @@ import {
   getSelectableVehicleStatusTransitions,
   isValidVehicleStatusTransition,
 } from "@/lib/vehicle-lifecycle";
+import { createClient } from "@/lib/supabase/server";
 
 type RouteContext = {
   params: Promise<{
@@ -263,6 +264,141 @@ export async function PATCH(
       {
         success: false,
         error: "Unable to update vehicle status.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  context: RouteContext
+) {
+  const auth = await requirePermission("DELETE_VEHICLE");
+
+  if (auth.response) {
+    return auth.response;
+  }
+
+  try {
+    const { id: vehicleId } = await context.params;
+
+    const vehicle = await db.vehicle.findUnique({
+      where: {
+        id: vehicleId,
+      },
+      select: {
+        id: true,
+        status: true,
+        photos: {
+          select: {
+            storagePath: true,
+          },
+        },
+        documents: {
+          select: {
+            storagePath: true,
+          },
+        },
+      },
+    });
+
+    if (!vehicle) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Vehicle not found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    if (vehicle.status === VehicleStatus.SOLD) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Sold vehicles cannot be deleted.",
+        },
+        { status: 409 }
+      );
+    }
+
+    const supabase = await createClient();
+
+    const photoPaths = vehicle.photos.map(
+      (photo) => photo.storagePath
+    );
+
+    const documentPaths = vehicle.documents.map(
+      (document) => document.storagePath
+    );
+
+    if (photoPaths.length > 0) {
+      const { error: photoCleanupError } =
+        await supabase.storage
+          .from("vehicle-photos")
+          .remove(photoPaths);
+
+      if (photoCleanupError) {
+        console.error(
+          "VINIX vehicle photo cleanup error:",
+          photoCleanupError
+        );
+
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Unable to clean up vehicle photos. Vehicle was not deleted.",
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    if (documentPaths.length > 0) {
+      const { error: documentCleanupError } =
+        await supabase.storage
+          .from("vehicle-documents")
+          .remove(documentPaths);
+
+      if (documentCleanupError) {
+        console.error(
+          "VINIX vehicle document cleanup error:",
+          documentCleanupError
+        );
+
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Unable to clean up vehicle documents. Vehicle was not deleted.",
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    await db.vehicle.delete({
+      where: {
+        id: vehicleId,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+    });
+  } catch (error) {
+    console.error(
+      "VINIX vehicle deletion error:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Unable to delete vehicle.",
       },
       { status: 500 }
     );

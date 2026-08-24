@@ -54,14 +54,6 @@ enum DocumentType {
   OTHER
 }
 
-enum OcrStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-  REVIEW_REQUIRED
-}
-
 enum PaymentStatus {
   PENDING
   PARTIAL
