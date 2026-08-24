@@ -179,15 +179,27 @@ export default function StockPage() {
   return (
     <main className="main">
       <div className="stock-header">
-        <div>
-          <div className="eyebrow">VINIX / Stock</div>
-          <h1>Vehicles</h1>
-        </div>
+  <div>
+    <div className="eyebrow">VINIX / Stock</div>
+    <h1>Vehicles</h1>
+  </div>
 
-        <Link href="/vehicles/new" className="primary-button">
-          + Add vehicle
-        </Link>
-      </div>
+  <div className="vehicle-header-actions">
+    <Link
+      href="/"
+      className="secondary-button"
+    >
+      ← Dashboard
+    </Link>
+
+    <Link
+      href="/vehicles/new"
+      className="primary-button"
+    >
+      + Add vehicle
+    </Link>
+  </div>
+</div>
 
       <section className="stock-toolbar">
         <input

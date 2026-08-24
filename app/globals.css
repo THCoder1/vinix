@@ -240,13 +240,20 @@ h1 {
 
 .status-badge {
   display: inline-flex;
-  padding: 5px 9px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  vertical-align: middle;
+  line-height: 1.2;
+  box-sizing: border-box;
+  padding: 8px 14px;
   border-radius: 999px;
-  background: #eef2f7;
-  color: #475569;
+  background: #fff4c2;
+  color: #8a6500;
   font-size: 11px;
   font-weight: 800;
 }
+
 
 .vehicle-location {
   color: var(--muted);
@@ -1217,4 +1224,118 @@ h1 {
 .danger-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.document-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.document-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(128, 128, 128, 0.22);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.document-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.document-main strong {
+  display: block;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.document-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  color: var(--muted-text, #888);
+  font-size: 0.8rem;
+}
+
+.document-meta span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.document-meta span + span::before {
+  content: "•";
+  margin-right: 0.4rem;
+  opacity: 0.45;
+}
+
+.document-item .secondary-button {
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .document-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .document-item .secondary-button {
+    width: 100%;
+  }
+}
+
+.document-upload-form {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(128, 128, 128, 0.22);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.primary-button,
+.secondary-button {
+  background: #dff4ff;
+  color: #0878b8;
+  border: 1px solid #9edcff;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.primary-button:hover,
+.secondary-button:hover {
+  background: #c8edff;
+  border-color: #7acbfa;
+  color: #05699f;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.preparation-card .section-heading {
+  align-items: center;
+  gap: 16px;
+}
+
+.preparation-card .section-heading > div:first-child {
+  min-width: 0;
+}
+
+.preparation-card .status-badge {
+  flex-shrink: 0;
+  min-width: 92px;
+  min-height: 44px;
+  padding: 8px 14px;
 }
