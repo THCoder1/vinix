@@ -72,7 +72,7 @@ export default function AcquisitionPage() {
   return (
     <main className="main">
       <Link href="/stock" className="back-link">
-        ← Back to stock
+        ÔåÉ Back to stock
       </Link>
 
       <div className="eyebrow">
