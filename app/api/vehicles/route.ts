@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 
 const createVehicleSchema = z.object({
   vin: z
@@ -86,11 +87,51 @@ export async function GET() {
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      vehicles,
-    });
-  } catch (error) {
+    const supabase = await createClient();
+
+const vehiclesWithPhotoUrls = await Promise.all(
+  vehicles.map(async (vehicle) => {
+    const photo = vehicle.photos[0];
+
+    if (!photo) {
+      return vehicle;
+    }
+
+    const {
+      data: signedUrlData,
+      error: signedUrlError,
+    } = await supabase.storage
+      .from("vehicle-photos")
+      .createSignedUrl(
+        photo.storagePath,
+        60 * 60
+      );
+
+    if (signedUrlError || !signedUrlData?.signedUrl) {
+      console.error(
+        "VINIX stock photo signed URL error:",
+        signedUrlError
+      );
+
+      return vehicle;
+    }
+
+    return {
+      ...vehicle,
+      photos: [
+        {
+          ...photo,
+          url: signedUrlData.signedUrl,
+        },
+      ],
+    };
+  })
+);
+
+return NextResponse.json({
+  success: true,
+  vehicles: vehiclesWithPhotoUrls,
+});  } catch (error) {
     console.error("VINIX vehicle fetch error:", error);
 
     return NextResponse.json(
