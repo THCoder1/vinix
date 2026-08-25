@@ -133,6 +133,24 @@ export default function VehiclePage({
   });
   const [savingSale, setSavingSale] = useState(false);
   const [saleError, setSaleError] = useState("");
+  const [showEditForm, setShowEditForm] =
+  useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const [editForm, setEditForm] = useState({
+    vin: "",
+    registration: "",
+    make: "",
+    model: "",
+    version: "",
+    firstRegistration: "",
+    mileage: "",
+    fuel: "",
+    engine: "",
+    transmission: "",
+    colour: "",
+    location: "",
+  });
 
   const [expenseForm, setExpenseForm] = useState({
     category: "MECHANICAL",
@@ -143,6 +161,7 @@ export default function VehiclePage({
     taxAmount: "",
     date: "",
 });
+
 
 const [savingExpense, setSavingExpense] = useState(false);
 
@@ -506,14 +525,40 @@ const formatMoney = (value: number) =>
         </div>
 
         <div className="vehicle-header-actions">
-  <button
-    type="button"
-    className="secondary-button"
-  >
-    Edit vehicle
-  </button>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => {
+              if (!vehicle) {
+                return;
+              }
 
-  {vehicle.status !== "SOLD" && (
+              setEditForm({
+                vin: vehicle.vin,
+                registration: vehicle.registration || "",
+                make: vehicle.make,
+                model: vehicle.model,
+                version: vehicle.version || "",
+                firstRegistration: vehicle.firstRegistration
+                  ? vehicle.firstRegistration.slice(0, 10)
+                  : "",
+                mileage:
+                  vehicle.mileage !== null
+                    ? String(vehicle.mileage)
+                    : "",
+                fuel: vehicle.fuel || "",
+                engine: vehicle.engine || "",
+                transmission: vehicle.transmission || "",
+                colour: vehicle.colour || "",
+                location: vehicle.location || "",
+              });
+
+              setError("");
+              setShowEditForm(true);
+            }}
+          >
+            Edit vehicle
+          </button>  {vehicle.status !== "SOLD" && (
     <button
       type="button"
       className="danger-button"
@@ -559,22 +604,563 @@ const formatMoney = (value: number) =>
 </div>
       </section>
 
+      {showEditForm && (
+  <section className="workspace-card">
+    <div className="section-heading">
+      <div>
+        <div className="eyebrow">Vehicle data</div>
+        <h2>Edit vehicle</h2>
+      </div>
+    </div>
+
+    <form
+      onSubmit={async (event) => {
+        event.preventDefault();
+
+        if (!vehicle) {
+          return;
+        }
+
+        setSavingEdit(true);
+        setError("");
+
+        try {
+          const response = await fetch(
+            `/api/vehicles/${vehicle.id}/edit`,
+            {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                vin: editForm.vin,
+                registration:
+                  editForm.registration || undefined,
+                make: editForm.make,
+                model: editForm.model,
+                version:
+                  editForm.version || undefined,
+                firstRegistration:
+                  editForm.firstRegistration ||
+                  undefined,
+                mileage:
+                  editForm.mileage !== ""
+                    ? Number(editForm.mileage)
+                    : undefined,
+                fuel:
+                  editForm.fuel || undefined,
+                engine:
+                  editForm.engine || undefined,
+                transmission:
+                  editForm.transmission ||
+                  undefined,
+                colour:
+                  editForm.colour || undefined,
+                location:
+                  editForm.location || undefined,
+              }),
+            }
+          );
+
+          const data = await response.json();
+
+          if (!response.ok || !data.success) {
+            throw new Error(
+              data.error || "Unable to update vehicle."
+            );
+          }
+
+          setVehicle((current) =>
+            current
+              ? {
+                  ...current,
+                  ...data.vehicle,
+                }
+              : current
+          );
+
+          setShowEditForm(false);
+        } catch (err) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to update vehicle."
+          );
+        } finally {
+          setSavingEdit(false);
+        }
+      }}
+    >
+      <div className="form-grid">
+        <label className="form-field">
+          <span>VIN *</span>
+          <input
+            value={editForm.vin}
+            onChange={(event) =>
+              setEditForm((current) => ({
+                ...current,
+                vin: event.target.value,
+              }))
+            }
+            required
+          />
+        </label>
+
+        <label className="form-field">
+          <span>Registration</span>
+          <input
+            value={editForm.registration}
+            onChange={(event) =>
+              setEditForm((current) => ({
+                ...current,
+                registration: event.target.value,
+              }))
+            }
+          />
+        </label>
+
+        <label className="form-field">
+          <span>Make *</span>
+          <input
+            value={editForm.make}
+            onChange={(event) =>
+              setEditForm((current) => ({
+                ...current,
+                make: event.target.value,
+              }))
+            }
+            required
+          />
+        </label>
+
+        <label className="form-field">
+          <span>Model *</span>
+          <input
+            value={editForm.model}
+            onChange={(event) =>
+              setEditForm((current) => ({
+                ...current,
+                model: event.target.value,
+              }))
+            }
+            required
+          />
+        </label>
+
+        <label className="form-field form-field-wide">
+          <span>Version</span>
+          <input
+            value={editForm.version}
+            onChange={(event) =>
+              setEditForm((current) => ({
+                ...current,
+                version: event.target.value,
+              }))
+            }
+          />
+        </label>
+
+        <label className="form-field">
+          <span>First registration</span>
+          <input
+            type="date"
+            value={editForm.firstRegistration}
+            onChange={(event) =>
+              setEditForm((current) => ({
+                ...current,
+                firstRegistration:
+                  event.target.value,
+              }))
+            }
+          />
+        </label>
+
+        <label className="form-field">
+          <span>Mileage</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={editForm.mileage}
+            onChange={(event) =>
+              setEditForm((current) => ({
+                ...current,
+                mileage: event.target.value,
+              }))
+            }
+          />
+        </label>
+
+        <label className="form-field">
+          <span>Fuel</span>
+          <select
+            value={editForm.fuel}
+            onChange={(event) =>
+              setEditForm((current) => ({
+                ...current,
+                fuel: event.target.value,
+              }))
+            }
+          >
+            <option value="">
+              Select fuel type
+            </option>
+            <option value="PETROL">Petrol</option>
+            <option value="DIESEL">Diesel</option>
+            <option value="HYBRID">Hybrid</option>
+            <option value="PLUG_IN_HYBRID">
+              Plug-in hybrid
+            </option>
+            <option value="ELECTRIC">Electric</option>
+            <option value="LPG">LPG</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </label>
+
+        <label className="form-field">
+          <span>Engine</span>
+          <input
+            value={editForm.engine}
+            onChange={(event) =>
+              setEditForm((current) => ({
+                ...current,
+                engine: event.target.value,
+              }))
+            }
+          />
+        </label>
+
+        <label className="form-field">
+          <span>Transmission</span>
+          <input
+            value={editForm.transmission}
+            onChange={(event) =>
+              setEditForm((current) => ({
+                ...current,
+                transmission:
+                  event.target.value,
+              }))
+            }
+          />
+        </label>
+
+        <label className="form-field">
+          <span>Colour</span>
+          <input
+            value={editForm.colour}
+            onChange={(event) =>
+              setEditForm((current) => ({
+                ...current,
+                colour: event.target.value,
+              }))
+            }
+          />
+        </label>
+
+        <label className="form-field">
+          <span>Location</span>
+          <input
+            value={editForm.location}
+            onChange={(event) =>
+              setEditForm((current) => ({
+                ...current,
+                location: event.target.value,
+              }))
+            }
+          />
+        </label>
+      </div>
+
+      <div className="form-actions">
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => setShowEditForm(false)}
+          disabled={savingEdit}
+        >
+          Cancel
+        </button>
+
+        <button
+          type="submit"
+          className="primary-button"
+          disabled={savingEdit}
+        >
+          {savingEdit
+            ? "Saving..."
+            : "Save changes"}
+        </button>
+      </div>
+    </form>
+  </section>
+)}
+
       <section className="vehicle-workspace">
         <div className="vehicle-main-column">
-          <div className="vehicle-hero-photo">
-            {primaryPhoto?.url ? (
-              <img
-                src={primaryPhoto.url}
-                alt={`${vehicle.make} ${vehicle.model}`}
-              />
-            ) : (
-              <div className="large-photo-placeholder">
-                <span>PHOTO</span>
-                <small>Add vehicle photos</small>
-              </div>
-            )}
-          </div>
+      <div className="vehicle-photo-panel">
+        <div className="vehicle-hero-photo">
+          {primaryPhoto?.url ? (
+            <img
+              src={primaryPhoto.url}
+              alt={`${vehicle.make} ${vehicle.model}`}
+            />
+          ) : (
+            <div className="large-photo-placeholder">
+              <span>PHOTO</span>
+              <small>Add vehicle photo</small>
+            </div>
+          )}
+        </div>
 
+  <div className="vehicle-photo-actions">
+    {!primaryPhoto ? (
+      <label className="primary-button photo-upload-button">
+        Add stock photo
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          hidden
+          onChange={async (event) => {
+            const file = event.target.files?.[0];
+
+            if (!file || !vehicle) {
+              return;
+            }
+
+            setError("");
+
+            try {
+              const formData = new FormData();
+              formData.append("file", file);
+
+              const response = await fetch(
+                `/api/vehicles/${vehicle.id}/photos`,
+                {
+                  method: "POST",
+                  body: formData,
+                }
+              );
+
+              const data = await response.json();
+
+              if (!response.ok || !data.success) {
+                throw new Error(
+                  data.error ||
+                    "Unable to upload stock photo."
+                );
+              }
+
+              const photo = data.photo;
+
+              const urlResponse = await fetch(
+                `/api/vehicles/${vehicle.id}/photos/url?photoId=${photo.id}`
+              );
+
+              const urlData =
+                await urlResponse.json();
+
+              if (
+                !urlResponse.ok ||
+                !urlData.success
+              ) {
+                throw new Error(
+                  "Photo uploaded but could not be displayed."
+                );
+              }
+
+              setVehicle((current) =>
+                current
+                  ? {
+                      ...current,
+                      photos: [
+                        {
+                          ...photo,
+                          url: urlData.photo.url,
+                        },
+                      ],
+                    }
+                  : current
+              );
+            } catch (err) {
+              setError(
+                err instanceof Error
+                  ? err.message
+                  : "Unable to upload stock photo."
+              );
+            } finally {
+              event.target.value = "";
+            }
+          }}
+        />
+      </label>
+    ) : (
+      <>
+        <label className="secondary-button photo-upload-button">
+          Change stock photo
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            hidden
+            onChange={async (event) => {
+              const file = event.target.files?.[0];
+
+              if (!file || !vehicle || !primaryPhoto) {
+                return;
+              }
+
+              setError("");
+
+              try {
+                const deleteResponse =
+                  await fetch(
+                    `/api/vehicles/${vehicle.id}/photos/${primaryPhoto.id}`,
+                    {
+                      method: "DELETE",
+                    }
+                  );
+
+                const deleteData =
+                  await deleteResponse.json();
+
+                if (
+                  !deleteResponse.ok ||
+                  !deleteData.success
+                ) {
+                  throw new Error(
+                    deleteData.error ||
+                      "Unable to remove the current stock photo."
+                  );
+                }
+
+                const formData = new FormData();
+                formData.append("file", file);
+
+                const uploadResponse =
+                  await fetch(
+                    `/api/vehicles/${vehicle.id}/photos`,
+                    {
+                      method: "POST",
+                      body: formData,
+                    }
+                  );
+
+                const uploadData =
+                  await uploadResponse.json();
+
+                if (
+                  !uploadResponse.ok ||
+                  !uploadData.success
+                ) {
+                  throw new Error(
+                    uploadData.error ||
+                      "Unable to upload replacement stock photo."
+                  );
+                }
+
+                const photo =
+                  uploadData.photo;
+
+                const urlResponse =
+                  await fetch(
+                    `/api/vehicles/${vehicle.id}/photos/url?photoId=${photo.id}`
+                  );
+
+                const urlData =
+                  await urlResponse.json();
+
+                if (
+                  !urlResponse.ok ||
+                  !urlData.success
+                ) {
+                  throw new Error(
+                    "Photo uploaded but could not be displayed."
+                  );
+                }
+
+                setVehicle((current) =>
+                  current
+                    ? {
+                        ...current,
+                        photos: [
+                          {
+                            ...photo,
+                            url: urlData.photo.url,
+                          },
+                        ],
+                      }
+                    : current
+                );
+              } catch (err) {
+                setError(
+                  err instanceof Error
+                    ? err.message
+                    : "Unable to change stock photo."
+                );
+              } finally {
+                event.target.value = "";
+              }
+            }}
+          />
+        </label>
+
+        <button
+          type="button"
+          className="danger-button"
+          onClick={async () => {
+            if (!vehicle || !primaryPhoto) {
+              return;
+            }
+
+            const confirmed = window.confirm(
+              "Delete the stock photo?"
+            );
+
+            if (!confirmed) {
+              return;
+            }
+
+            setError("");
+
+            try {
+              const response = await fetch(
+                `/api/vehicles/${vehicle.id}/photos/${primaryPhoto.id}`,
+                {
+                  method: "DELETE",
+                }
+              );
+
+              const data = await response.json();
+
+              if (!response.ok || !data.success) {
+                throw new Error(
+                  data.error ||
+                    "Unable to delete stock photo."
+                );
+              }
+
+              setVehicle((current) =>
+                current
+                  ? {
+                      ...current,
+                      photos: [],
+                    }
+                  : current
+              );
+            } catch (err) {
+              setError(
+                err instanceof Error
+                  ? err.message
+                  : "Unable to delete stock photo."
+              );
+            }
+          }}
+        >
+          Delete photo
+        </button>
+      </>
+    )}
+  </div>
+</div>
           <section className="workspace-card">
             <div className="section-heading">
               <div>

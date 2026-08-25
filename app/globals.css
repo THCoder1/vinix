@@ -1339,3 +1339,35 @@ h1 {
   min-height: 44px;
   padding: 8px 14px;
 }
+
+.vehicle-photo-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.vehicle-photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.photo-upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+@media (max-width: 640px) {
+  .vehicle-photo-actions {
+    flex-direction: column;
+  }
+
+  .vehicle-photo-actions .primary-button,
+  .vehicle-photo-actions .secondary-button,
+  .vehicle-photo-actions .danger-button {
+    width: 100%;
+  }
+}
